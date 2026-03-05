@@ -9443,18 +9443,86 @@
     }
   ],
   "progress": {
-    "Veltrix": {
-      "OtherPlayer": 410.12,
-      "Teero": 402.54
+    "FlipLipp5": {
+      "Teero": 92.76
     },
-    "001": {
-      "Teero": 120.5,
-      "Speedrunner": 115.0
+    "Vampyrali3": {
+      "Teero": 154.5
+    },
+    "Circuit": {
+      "Teero": 67.32
+    },
+    "Minimalist1": {
+      "Teero": 160.16
+    },
+    "Savannux": {
+      "Teero": 53.64
+    },
+    "Bushes": {
+      "Teero": 41.68
+    },
+    "Kero4QshaR": {
+      "Teero": 159.28
+    },
+    "BlackDoods": {
+      "Teero": 113.52
+    },
+    "Himalaya": {
+      "Teero": 336.96
+    },
+    "FlipLipp13": {
+      "Teero": 103.22
+    },
+    "UnKnown4Grass": {
+      "Teero": 106.02
+    },
+    "HeyTux6": {
+      "Teero": 180.56
+    },
+    "meew1": {
+      "Teero": 208.28
+    },
+    "Paris": {
+      "Teero": 95.72
+    },
+    "Discipline": {
+      "Teero": 889.42
+    },
+    "Dystopia": {
+      "Teero": 178.72
+    },
+    "Kero4cooper": {
+      "Teero": 130.84
+    },
+    "PeaceDeath": {
+      "Teero": 219.84
+    },
+    "Gores-Dream1": {
+      "Teero": 90.9
+    },
+    "azra": {
+      "Teero": 236.34
+    },
+    "Goldie": {
+      "Teero": 53.82
+    },
+    "Protokol3": {
+      "Teero": 121.54
+    },
+    "Koggers": {
+      "Teero": 217.14
+    },
+    "Q-Easy2": {
+      "Teero": 68.46
+    },
+    "uk1": {
+      "Teero": 176.02
+    },
+    "Shyzo4Cecily": {
+      "Teero": 140.74
     }
   },
   "players": [
-    "Teero",
-    "Speedrunner",
-    "OtherPlayer"
+    "Teero"
   ]
 }
