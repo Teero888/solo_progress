@@ -23,7 +23,7 @@ const data = mapsData as MapsJson;
 
 type SortField = keyof MapEntry | 'time';
 
-const DIFFICULTIES = ['All', ...new Set(data.maps.map(m => m.difficulty))];
+const DIFFICULTIES = ['All', 'Easy', 'Main', 'Hard', 'Insane', 'Extreme', 'Mod', 'Solo', 'Others'];
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
 const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
@@ -116,6 +116,9 @@ function App() {
         if (sortField === 'time') {
           valA = getMapTime(a.name);
           valB = getMapTime(b.name);
+        } else if (sortField === 'difficulty') {
+          valA = DIFFICULTIES.indexOf(a.difficulty);
+          valB = DIFFICULTIES.indexOf(b.difficulty);
         } else {
           valA = a[sortField];
           valB = b[sortField];
@@ -144,8 +147,12 @@ function App() {
   const stats = useMemo(() => {
     let finished = 0;
     let points = 0;
+    let total = 0;
     
     data.maps.forEach(m => {
+      if (diffFilter !== 'All' && m.difficulty !== diffFilter) return;
+      
+      total++;
       const mapProgress = data.progress[m.name] || {};
       const isFinished = currentPlayer === 'All Players' 
         ? Object.keys(mapProgress).length > 0 
@@ -159,11 +166,11 @@ function App() {
 
     return {
       finished,
-      total: data.maps.length,
-      percent: ((finished / data.maps.length) * 100).toFixed(1),
+      total,
+      percent: total > 0 ? ((finished / total) * 100).toFixed(1) : '0.0',
       points
     }
-  }, [currentPlayer]);
+  }, [currentPlayer, diffFilter]);
 
   return (
     <div className="container">
