@@ -57,7 +57,7 @@ data = {
     "players": list(set(p for m in progress.values() for p in m.keys()))
 }
 
-with open('src/data/maps.json', 'w', encoding='utf-8') as f:
+with open('src/data/maps.json', 'w+', encoding='utf-8') as f:
     json.dump(data, f, indent=2)
 
 print(f"Parsed {len(maps)} maps and found progress for {len(data['players'])} players.")
