@@ -1,6 +1,7 @@
 {
   "name": "site",
   "private": true,
+  "homepage": "https://teero888.github.io/solo_progress/",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
