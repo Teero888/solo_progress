@@ -57,6 +57,7 @@ data = {
     "players": list(set(p for m in progress.values() for p in m.keys()))
 }
 
+os.makedirs('src/data', exist_ok=True)
 with open('src/data/maps.json', 'w+', encoding='utf-8') as f:
     json.dump(data, f, indent=2)
 
