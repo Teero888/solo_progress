@@ -29,8 +29,8 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies & run script
+        run: npm ci && python parse_maps.py
       - name: Build
         run: npm run build
       - name: Setup Pages
