@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import mapsData from './data/maps.json'
 import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users } from 'lucide-react'
 import './App.css'
@@ -23,16 +23,58 @@ const data = mapsData as MapsJson;
 
 type SortField = keyof MapEntry | 'time';
 
-function App() {
-  const [search, setSearch] = useState('')
-  const [diffFilter, setDiffFilter] = useState('All')
-  const [statusFilter, setStatusFilter] = useState('All')
-  const [currentPlayer, setCurrentPlayer] = useState('All Players')
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+const DIFFICULTIES = ['All', ...new Set(data.maps.map(m => m.difficulty))];
+const ALL_PLAYERS = ['All Players', ...data.players.sort()];
+const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'creator', 'date', 'time'];
+const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
-  const difficulties = useMemo(() => ['All', ...new Set(data.maps.map(m => m.difficulty))], [])
-  const allPlayers = useMemo(() => ['All Players', ...data.players.sort()], [])
+function App() {
+  const [search, setSearch] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('q') || '';
+  })
+  const [diffFilter, setDiffFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('diff') || 'All';
+    return DIFFICULTIES.includes(val) ? val : 'All';
+  })
+  const [statusFilter, setStatusFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('status') || 'All';
+    return VALID_STATUS.includes(val) ? val : 'All';
+  })
+  const [currentPlayer, setCurrentPlayer] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('player') || 'All Players';
+    return ALL_PLAYERS.includes(val) ? val : 'All Players';
+  })
+  const [sortField, setSortField] = useState<SortField>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('sort') as SortField;
+    return VALID_SORT_FIELDS.includes(val) ? val : 'name';
+  })
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('order');
+    return val === 'asc' || val === 'desc' ? val : 'asc';
+  })
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('q', search);
+    if (diffFilter !== 'All') params.set('diff', diffFilter);
+    if (statusFilter !== 'All') params.set('status', statusFilter);
+    if (currentPlayer !== 'All Players') params.set('player', currentPlayer);
+    if (sortField !== 'name') params.set('sort', sortField);
+    if (sortOrder !== 'asc') params.set('order', sortOrder);
+
+    const queryString = params.toString();
+    const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
+    window.history.replaceState(null, '', newRelativePathQuery);
+  }, [search, diffFilter, statusFilter, currentPlayer, sortField, sortOrder]);
+
+  const difficulties = DIFFICULTIES;
+  const allPlayers = ALL_PLAYERS;
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
