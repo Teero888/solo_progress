@@ -29,6 +29,10 @@ jobs:
         with:
           node-version: lts/*
           cache: 'npm'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - name: Install dependencies & run script
         run: npm ci && python parse_maps.py
       - name: Build
