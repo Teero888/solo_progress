@@ -3,7 +3,7 @@ import re
 import json
 import urllib.request
 
-MAP_INFO_URL = "https://raw.githubusercontent.com/Gamer12120/KoGmaps/refs/heads/main/mapinfo%20and%20credits.txt"
+MAP_INFO_URL = "https://raw.githubusercontent.com/Teero888/KoGmaps/refs/heads/main/mapinfo.txt"
 
 def parse_maps():
     maps = []
@@ -19,7 +19,7 @@ def parse_maps():
     for line in data_lines:
         if not line.strip(): continue
         parts = [p.strip() for p in line.split('|')]
-        if len(parts) < 6: continue
+        if len(parts) < 7: continue
 
         difficulty = parts[1]
         if difficulty == 'Solo': continue
@@ -30,8 +30,9 @@ def parse_maps():
             "stars": parts[2],
             "stars_count": parts[2].count('★'),
             "points": int(parts[3]) if parts[3].isdigit() else 0,
-            "creator": parts[4],
-            "date": parts[5]
+            "length": parts[4],
+            "creator": parts[5],
+            "date": parts[6]
         })
     return maps
 

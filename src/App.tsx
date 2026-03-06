@@ -9,6 +9,7 @@ interface MapEntry {
   stars: string;
   stars_count: number;
   points: number;
+  length: string;
   creator: string;
   date: string;
 }
@@ -24,8 +25,10 @@ const data = mapsData as MapsJson;
 type SortField = keyof MapEntry | 'time';
 
 const DIFFICULTIES = ['All', 'Easy', 'Main', 'Hard', 'Insane', 'Extreme', 'Mod', 'Others'];
+const LENGTHS = ['All', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-'];
+const LENGTH_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-'];
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
-const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'creator', 'date', 'time'];
+const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
 function App() {
@@ -37,6 +40,11 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     const val = params.get('diff') || 'All';
     return DIFFICULTIES.includes(val) ? val : 'All';
+  })
+  const [lengthFilter, setLengthFilter] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('length') || 'All';
+    return LENGTHS.includes(val) ? val : 'All';
   })
   const [statusFilter, setStatusFilter] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -63,6 +71,7 @@ function App() {
     const params = new URLSearchParams();
     if (search) params.set('q', search);
     if (diffFilter !== 'All') params.set('diff', diffFilter);
+    if (lengthFilter !== 'All') params.set('length', lengthFilter);
     if (statusFilter !== 'All') params.set('status', statusFilter);
     if (currentPlayer !== 'All Players') params.set('player', currentPlayer);
     if (sortField !== 'name') params.set('sort', sortField);
@@ -71,7 +80,7 @@ function App() {
     const queryString = params.toString();
     const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
     window.history.replaceState(null, '', newRelativePathQuery);
-  }, [search, diffFilter, statusFilter, currentPlayer, sortField, sortOrder]);
+  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder]);
 
   const difficulties = DIFFICULTIES;
   const allPlayers = ALL_PLAYERS;
@@ -97,6 +106,7 @@ function App() {
         const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) || 
                              m.creator.toLowerCase().includes(search.toLowerCase());
         const matchesDiff = diffFilter === 'All' || m.difficulty === diffFilter;
+        const matchesLength = lengthFilter === 'All' || m.length === lengthFilter;
         
         const mapProgress = data.progress[m.name] || {};
         const isFinishedByCurrent = currentPlayer === 'All Players' 
@@ -107,7 +117,7 @@ function App() {
                              (statusFilter === 'Finished' && isFinishedByCurrent) || 
                              (statusFilter === 'Pending' && !isFinishedByCurrent);
         
-        return matchesSearch && matchesDiff && matchesStatus;
+        return matchesSearch && matchesDiff && matchesLength && matchesStatus;
       })
       .sort((a, b) => {
         let valA: any;
@@ -119,6 +129,9 @@ function App() {
         } else if (sortField === 'difficulty') {
           valA = DIFFICULTIES.indexOf(a.difficulty);
           valB = DIFFICULTIES.indexOf(b.difficulty);
+        } else if (sortField === 'length') {
+          valA = LENGTH_ORDER.indexOf(a.length);
+          valB = LENGTH_ORDER.indexOf(b.length);
         } else {
           valA = a[sortField];
           valB = b[sortField];
@@ -133,7 +146,7 @@ function App() {
         const res = valA > valB ? 1 : -1;
         return sortOrder === 'asc' ? res : -res;
       });
-  }, [search, diffFilter, statusFilter, sortField, sortOrder, currentPlayer]);
+  }, [search, diffFilter, lengthFilter, statusFilter, sortField, sortOrder, currentPlayer]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -151,6 +164,7 @@ function App() {
     
     data.maps.forEach(m => {
       if (diffFilter !== 'All' && m.difficulty !== diffFilter) return;
+      if (lengthFilter !== 'All' && m.length !== lengthFilter) return;
       
       total++;
       const mapProgress = data.progress[m.name] || {};
@@ -170,7 +184,7 @@ function App() {
       percent: total > 0 ? ((finished / total) * 100).toFixed(1) : '0.0',
       points
     }
-  }, [currentPlayer, diffFilter]);
+  }, [currentPlayer, diffFilter, lengthFilter]);
 
   return (
     <div className="container">
@@ -218,6 +232,13 @@ function App() {
               </select>
             </div>
 
+            <div className="filter-group">
+              <Clock size={16} />
+              <select value={lengthFilter} onChange={(e) => setLengthFilter(e.target.value)}>
+                {LENGTHS.map(l => <option key={l} value={l}>{l === 'All' ? 'All Lengths' : l}</option>)}
+              </select>
+            </div>
+
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="All">All Status</option>
               <option value="Finished">Finished</option>
@@ -242,6 +263,9 @@ function App() {
               </th>
               <th onClick={() => toggleSort('points')} className="sortable">
                 Points {sortField === 'points' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+              </th>
+              <th onClick={() => toggleSort('length')} className="sortable">
+                Length {sortField === 'length' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
               </th>
               <th onClick={() => toggleSort('creator')} className="sortable">
                 <User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
@@ -271,6 +295,7 @@ function App() {
                   </td>
                   <td className="stars">{map.stars}</td>
                   <td className="font-mono">{map.points}</td>
+                  <td className="font-mono text-center">{map.length}</td>
                   <td className="text-dim">{map.creator}</td>
                   <td>
                     {isFinished ? (

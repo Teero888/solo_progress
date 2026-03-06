@@ -198,6 +198,7 @@ select:hover {
 .font-bold { font-weight: 700; }
 .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .text-dim { color: #64748b; }
+.text-center { text-align: center; }
 
 .stars {
   color: #f59e0b;
@@ -290,7 +291,9 @@ select:hover {
 
 @media (max-width: 1024px) {
   .maps-table th:nth-child(5),
-  .maps-table td:nth-child(5) {
+  .maps-table td:nth-child(5),
+  .maps-table th:nth-child(6),
+  .maps-table td:nth-child(6) {
     display: none;
   }
 }
