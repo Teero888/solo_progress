@@ -20,7 +20,7 @@ def parse_maps():
         if not line.strip(): continue
         parts = [p.strip() for p in line.split('|')]
         if len(parts) < 6: continue
-        
+
         difficulty = parts[1]
         if difficulty == 'Solo': continue
 
@@ -44,18 +44,19 @@ def parse_demos():
     for filename in os.listdir('demos'):
         if filename.endswith('.demo'):
             # Format: MapName_TimeInSeconds_PlayerName.demo
-            parts = filename.replace('.demo', '').split('_')
-            if len(parts) >= 3:
-                map_name = parts[0]
+            # Use regex to find the time (float) which separates map name and player name
+            match = re.search(r'(.+)_(\d+\.\d+)_([^/]+)\.demo', filename)
+            if match:
+                map_name = match.group(1)
                 try:
-                    time = float(parts[1])
+                    time = float(match.group(2))
                 except ValueError:
                     continue
-                player_name = "_".join(parts[2:]) # Handle names with underscores
-                
+                player_name = match.group(3)
+
                 if map_name not in progress:
                     progress[map_name] = {}
-                
+
                 if player_name not in progress[map_name] or time < progress[map_name][player_name]:
                     progress[map_name][player_name] = time
     return progress
