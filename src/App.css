@@ -223,7 +223,6 @@ select:hover {
 .badge-insane { background: #8b5cf622; color: #8b5cf6; border: 1px solid #8b5cf644; }
 .badge-extreme { background: #ef444422; color: #ef4444; border: 1px solid #ef444444; }
 .badge-mod { background: #ec489922; color: #ec4899; border: 1px solid #ec489944; }
-.badge-solo { background: #06b6d422; color: #06b6d4; border: 1px solid #06b6d444; }
 
 .leaderboard {
   display: flex;

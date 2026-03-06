@@ -23,7 +23,7 @@ const data = mapsData as MapsJson;
 
 type SortField = keyof MapEntry | 'time';
 
-const DIFFICULTIES = ['All', 'Easy', 'Main', 'Hard', 'Insane', 'Extreme', 'Mod', 'Solo', 'Others'];
+const DIFFICULTIES = ['All', 'Easy', 'Main', 'Hard', 'Insane', 'Extreme', 'Mod', 'Others'];
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
 const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];

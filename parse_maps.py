@@ -1,25 +1,38 @@
 import os
 import re
 import json
+import urllib.request
+
+MAP_INFO_URL = "https://raw.githubusercontent.com/Gamer12120/KoGmaps/refs/heads/main/mapinfo%20and%20credits.txt"
 
 def parse_maps():
     maps = []
-    with open('mapinfo and credits.txt', 'r', encoding='utf-8') as f:
-        lines = f.readlines()
-        data_lines = lines[2:]
-        for line in data_lines:
-            if not line.strip(): continue
-            parts = [p.strip() for p in line.split('|')]
-            if len(parts) < 6: continue
-            maps.append({
-                "name": parts[0],
-                "difficulty": parts[1],
-                "stars": parts[2],
-                "stars_count": parts[2].count('★'),
-                "points": int(parts[3]) if parts[3].isdigit() else 0,
-                "creator": parts[4],
-                "date": parts[5]
-            })
+    try:
+        with urllib.request.urlopen(MAP_INFO_URL) as response:
+            content = response.read().decode('utf-8')
+            lines = content.splitlines()
+    except Exception as e:
+        print(f"Error fetching map info: {e}")
+        return []
+
+    data_lines = lines[2:]
+    for line in data_lines:
+        if not line.strip(): continue
+        parts = [p.strip() for p in line.split('|')]
+        if len(parts) < 6: continue
+        
+        difficulty = parts[1]
+        if difficulty == 'Solo': continue
+
+        maps.append({
+            "name": parts[0],
+            "difficulty": difficulty,
+            "stars": parts[2],
+            "stars_count": parts[2].count('★'),
+            "points": int(parts[3]) if parts[3].isdigit() else 0,
+            "creator": parts[4],
+            "date": parts[5]
+        })
     return maps
 
 def parse_demos():
