@@ -5,8 +5,19 @@ import urllib.request
 
 MAP_INFO_URL = "https://raw.githubusercontent.com/Teero888/KoGmaps/refs/heads/main/mapinfo.txt"
 
+def load_blacklist():
+    blacklist = set()
+    if os.path.exists('blacklist.txt'):
+        with open('blacklist.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    blacklist.add(line)
+    return blacklist
+
 def parse_maps():
     maps = []
+    blacklist = load_blacklist()
     try:
         with urllib.request.urlopen(MAP_INFO_URL) as response:
             content = response.read().decode('utf-8')
@@ -21,11 +32,14 @@ def parse_maps():
         parts = [p.strip() for p in line.split('|')]
         if len(parts) < 7: continue
 
+        map_name = parts[0]
+        if map_name in blacklist: continue
+
         difficulty = parts[1]
         if difficulty == 'Solo': continue
 
         maps.append({
-            "name": parts[0],
+            "name": map_name,
             "difficulty": difficulty,
             "stars": parts[2],
             "stars_count": parts[2].count('★'),

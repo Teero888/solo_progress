@@ -1,0 +1,18 @@
+# blacklist for maps that are not soloable or not teamable.
+# i only want maps that can be completed as a team and as solo.
+Aled_to_the_Legend
+BabyDragger
+DummyPhantom
+Gorace
+hanh_phuc
+HawerDummy
+Himalaya
+Himalaya2
+Himalaya3
+KeroDummy
+NyantoDummy
+Q-Dummy-Drag1
+Q-Dummy-Drag2
+Q-Gores-Unhook
+Shadow_Spring
+Together
