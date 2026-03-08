@@ -1,6 +1,6 @@
-[submodule "public/maps"]
-	path = public/maps
-	url = https://github.com/Teero888/KoGmaps.git
 [submodule "twgpu"]
 	path = twgpu
 	url = https://gitlab.com/ddnet-rs/twgpu.git
+[submodule "public/maps"]
+	path = public/maps
+	url = https://github.com/Teero888/KoGmaps.git
