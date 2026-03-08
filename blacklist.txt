@@ -1,5 +1,6 @@
 # blacklist for maps that are not soloable or not teamable.
 # i only want maps that can be completed as a team and as solo.
+
 Aled_to_the_Legend
 BabyDragger
 DummyPhantom
