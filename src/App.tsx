@@ -58,7 +58,7 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
     );
   }
 
-  const imageUrl = `${baseUrl}/previews/${encodeURIComponent(mapName)}.png`;
+  const imageUrl = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
   return (
     <div className="hover-preview">
       {hasError ? (
