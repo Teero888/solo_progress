@@ -10,6 +10,7 @@
         height: 100%;
         overflow: hidden;
         background: linear-gradient(#5e84ae, #cce8ff);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       }
       canvas {
         display: block;
@@ -18,12 +19,114 @@
         overflow: hidden;
         touch-action: none;
       }
+      .controls {
+        position: absolute;
+        bottom: 24px;
+        right: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 1000;
+      }
+      .zoom-btn {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-size: 24px;
+        font-weight: 300;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s ease;
+        backdrop-filter: blur(8px);
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .zoom-btn:hover {
+        background: rgba(0, 0, 0, 0.8);
+        transform: translateY(-2px);
+      }
+      .zoom-btn:active {
+        transform: translateY(0) scale(0.95);
+        background: rgba(0, 0, 0, 0.9);
+      }
     </style>
   </head>
   <body>
     <!-- Get the source at https://gitlab.com/Patiga/twgpu in map-inspect-web -->
     <canvas id="viewport" style="width: 100%; height: 100%"> </canvas>
+    
+    <div class="controls">
+      <button class="zoom-btn" onclick="window.zoomStep(-1)" title="Zoom In">+</button>
+      <button class="zoom-btn" onclick="window.zoomStep(1)" title="Zoom Out">−</button>
+    </div>
+
     <script type="module">
+      
+      let zoomAccumulator = 0;
+      const PULSE_THRESHOLD = 1.0; 
+      
+      window.zoomStep = (direction) => {
+        // direction -1 for IN (+), 1 for OUT (-)
+        sendWheelPulse(direction * 100);
+      };
+
+      function sendWheelPulse(deltaY) {
+        const canvas = document.getElementById('viewport');
+        if (!canvas) return;
+        
+        // We use a real WheelEvent which we know the Rust code picks up
+        const event = new WheelEvent('wheel', {
+          deltaY: deltaY,
+          deltaMode: 0,
+          bubbles: true,
+          cancelable: true,
+        });
+        canvas.dispatchEvent(event);
+      }
+
+      window.addEventListener('wheel', (e) => {
+        if (!e.isTrusted) return; 
+        
+        if (e.target.tagName === 'CANVAS') {
+          e.preventDefault();
+          
+          // Accumulate scroll distance
+          zoomAccumulator += e.deltaY * 0.01;
+          
+          while (Math.abs(zoomAccumulator) >= PULSE_THRESHOLD) {
+            const direction = zoomAccumulator > 0 ? 1 : -1;
+            sendWheelPulse(direction * 100);
+            zoomAccumulator -= direction * PULSE_THRESHOLD;
+          }
+        }
+      }, { passive: false });
+
+      // Keyboard Shortcuts
+      window.addEventListener('keydown', (e) => {
+        const key = e.key.toLowerCase();
+        if (key === 'w' || key === '+' || key === '=' || e.code === 'NumpadAdd') {
+          e.preventDefault();
+          window.zoomStep(-1); // Zoom In
+        } else if (key === 's' || key === '-' || e.code === 'NumpadSubtract') {
+          e.preventDefault();
+          window.zoomStep(1); // Zoom Out
+        }
+      });
+
+      // Cleanup accumulator if user stops scrolling
+      let scrollTimeout;
+      window.addEventListener('wheel', () => {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          zoomAccumulator = 0;
+        }, 150);
+      });
+
       const parsedUrl = new URL(window.location.href);
       let params = parsedUrl.searchParams;
 
