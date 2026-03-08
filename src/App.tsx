@@ -112,7 +112,15 @@ function App() {
 
   const [hoveredMap, setHoveredMap] = useState<{name: string, difficulty: string} | null>(null);
   const [hoverY, setHoverY] = useState<number>(0);
-  const [selectedMap, setSelectedMap] = useState<{name: string, difficulty: string} | null>(null);
+  const [selectedMap, setSelectedMap] = useState<{name: string, difficulty: string} | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mapName = params.get('preview');
+    if (mapName) {
+      const map = data.maps.find(m => m.name === mapName);
+      if (map) return { name: map.name, difficulty: map.difficulty };
+    }
+    return null;
+  });
   const hoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -124,11 +132,12 @@ function App() {
     if (currentPlayer !== 'All Players') params.set('player', currentPlayer);
     if (sortField !== 'name') params.set('sort', sortField);
     if (sortOrder !== 'asc') params.set('order', sortOrder);
+    if (selectedMap) params.set('preview', selectedMap.name);
 
     const queryString = params.toString();
     const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
     window.history.replaceState(null, '', newRelativePathQuery);
-  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder]);
+  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder, selectedMap]);
 
   const difficulties = DIFFICULTIES;
   const allPlayers = ALL_PLAYERS;
