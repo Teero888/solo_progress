@@ -3,8 +3,6 @@ import re
 import json
 import urllib.request
 
-MAP_INFO_URL = "https://raw.githubusercontent.com/Teero888/KoGmaps/refs/heads/main/mapinfo.txt"
-
 def load_blacklist():
     blacklist = set()
     if os.path.exists('blacklist.txt'):
@@ -19,11 +17,10 @@ def parse_maps():
     maps = []
     blacklist = load_blacklist()
     try:
-        with urllib.request.urlopen(MAP_INFO_URL) as response:
-            content = response.read().decode('utf-8')
-            lines = content.splitlines()
+        with open('public/maps/mapinfo.txt', 'r', encoding='utf-8') as f:
+            lines = f.readlines()
     except Exception as e:
-        print(f"Error fetching map info: {e}")
+        print(f"Error reading map info: {e}")
         return []
 
     data_lines = lines[2:]

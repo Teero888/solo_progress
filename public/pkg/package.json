@@ -1,0 +1,29 @@
+{
+  "name": "map-inspect-web",
+  "type": "module",
+  "collaborators": [
+    "Patiga <dev@patiga.eu>"
+  ],
+  "description": "Tool to see rendered Teeworlds and DDNet maps, in the web",
+  "version": "0.2.0",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://gitlab.com/Patiga/twgpu"
+  },
+  "files": [
+    "map_inspect_web_bg.wasm",
+    "map_inspect_web.js",
+    "map_inspect_web.d.ts"
+  ],
+  "main": "map_inspect_web.js",
+  "types": "map_inspect_web.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ],
+  "keywords": [
+    "teeworlds",
+    "ddnet",
+    "graphics"
+  ]
+}

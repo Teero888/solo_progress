@@ -1,0 +1,169 @@
+<!doctype html>
+
+<html style="margin: 0; width: 100%; height: 100%; overflow: hidden">
+  <head>
+    <meta name="viewport" content="width=device-width" />
+    <style>
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: linear-gradient(#5e84ae, #cce8ff);
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Get the source at https://gitlab.com/Patiga/twgpu in map-inspect-web -->
+    <canvas id="viewport" style="width: 100%; height: 100%"> </canvas>
+    <script type="module">
+      const parsedUrl = new URL(window.location.href);
+      let params = parsedUrl.searchParams;
+
+      let map_data = undefined;
+      if (params.has("map")) {
+        const mapName = params.get("map");
+        const diffHint = params.get("diff");
+        
+        // Difficulty subdirectories
+        const difficulties = ["EASY", "MAIN", "HARD", "INSANE", "EXTREME", "MOD", "OTHERS", "SOLO"];
+        
+        async function tryFetchMap() {
+          // If we have a hint, try it first
+          if (diffHint) {
+            const hintUrl = `maps/${diffHint.toUpperCase()}/${mapName}.map`;
+            console.log(`Trying hint path: ${hintUrl}`);
+            try {
+              const response = await fetch(hintUrl);
+              if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (!(contentType && contentType.includes("text/html"))) {
+                  console.log(`Successfully fetched from hint: ${hintUrl}`);
+                  return response;
+                }
+              }
+            } catch (e) {}
+          }
+
+          for (const diff of difficulties) {
+            if (diff === diffHint?.toUpperCase()) continue; // already tried
+            const url = `maps/${diff}/${mapName}.map`;
+            console.log(`Trying to fetch map from: ${url}`);
+            try {
+              const response = await fetch(url);
+              if (response.ok) {
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("text/html")) {
+                   console.warn(`Fetched HTML instead of map data from ${url}. Probably Vite fallback.`);
+                   continue;
+                }
+                console.log(`Successfully fetched map from: ${url}`);
+                return response;
+              }
+            } catch (e) {
+              console.error(`Error fetching from ${url}:`, e);
+            }
+          }
+          // Try root as fallback
+          const rootUrl = `maps/${mapName}.map`;
+          console.log(`Trying fallback root: ${rootUrl}`);
+          return fetch(rootUrl);
+        }
+        
+        map_data = tryFetchMap();
+      } else if (params.has("ddnet")) {
+        let url = new URL("https://ddnet.org/mappreview/");
+        url.pathname += params.get("ddnet") + ".map";
+        map_data = fetch(url);
+      } else if (params.has("ddnet-testing")) {
+        let url = new URL("https://ddnet.org/testmaps/");
+        url.pathname += params.get("ddnet-testing") + ".map";
+        map_data = fetch(url);
+      } else if (params.has("url")) {
+        map_data = fetch(params.get("url"));
+      }
+
+      var viewport = document.getElementById("viewport");
+
+      function reload_to(param, value) {
+        if (!value) {
+          return;
+        }
+        let url_parameters = new URLSearchParams();
+        url_parameters.set(param, value);
+        let url = `/?${url_parameters.toString()}`;
+        document.location.href = url;
+      }
+
+      if (map_data == undefined) {
+        viewport.style.pointerEvents = "none";
+        viewport.style.position = "absolute";
+        let select_div = document.createElement("div");
+        select_div.class = "container";
+        select_div.style = "width: 100%; height: 100%; display:flex; align-items:center; justify-content:center;";
+        document.body.appendChild(select_div);
+        //document.body.insertBefore(select_div, viewport);
+        let select = document.createElement("select");
+        select_div.appendChild(select);
+        let first = document.createElement("option");
+        first.value = "";
+        first.innerText = "DDNet Maps";
+        select.appendChild(first);
+        fetch("https://ddnet.org/releases/maps.json")
+          .then((a) => a.json())
+          .then((list) => {
+            let maps = list.map((m) => m.name);
+            maps.sort();
+            for (const map of maps) {
+              let option = document.createElement("option");
+              option.value = map;
+              option.innerText = map;
+              select.appendChild(option);
+            }
+          });
+        select.addEventListener("input", (evt) => reload_to("ddnet", evt.target.value));
+      }
+
+      import init, { RenderInit } from "./pkg/map_inspect_web.js";
+      await init();
+
+      var render_init = await new RenderInit(viewport, params.get("backend"));
+
+      async function parse_present_map(map_data) {
+        console.log("Initializing renderer");
+        try {
+          var renderer = await render_init.prepare_map(map_data);
+        } catch (err) {
+          alert(`Failed to load map: ${err}`);
+          return;
+        }
+
+        document.body.appendChild(viewport);
+        console.log("Running renderer");
+        renderer.run();
+      }
+
+      if (map_data != undefined) {
+        console.log("Waiting for map");
+        let response = await map_data;
+        if (!response.ok) {
+          alert(`Map fetch failed: ${response.status} ${response.statusText}`);
+        } else {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("text/html")) {
+            alert(`Error: Fetched HTML instead of map data. Please check map name or path.`);
+          } else {
+            parse_present_map(await response.bytes());
+          }
+        }
+      }
+    </script>
+  </body>
+</html>

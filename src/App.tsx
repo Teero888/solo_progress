@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import mapsData from './data/maps.json'
-import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users } from 'lucide-react'
+import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2 } from 'lucide-react'
 import './App.css'
 
 interface MapEntry {
@@ -30,6 +30,49 @@ const LENGTH_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
 const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
+
+function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName: string, difficulty: string, isFull?: boolean, onClose?: () => void }) {
+  const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const [hasError, setHasError] = useState(false);
+
+  // Reset error state when map changes
+  useEffect(() => {
+    setHasError(false);
+  }, [mapName]);
+  
+  if (isFull) {
+    const diffParam = difficulty.toUpperCase();
+    const url = `${baseUrl}/map_preview.html?map=${encodeURIComponent(mapName)}&diff=${encodeURIComponent(diffParam)}`;
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <h3>{mapName}</h3>
+            <button className="close-button" onClick={onClose}><X size={24} /></button>
+          </div>
+          <div className="modal-body">
+            <iframe src={url} title={`Map preview: ${mapName}`} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const imageUrl = `${baseUrl}/previews/${encodeURIComponent(mapName)}.png`;
+  return (
+    <div className="hover-preview">
+      {hasError ? (
+        <span className="hover-preview-loading">No preview available</span>
+      ) : (
+        <img 
+          src={imageUrl} 
+          alt={`Map preview: ${mapName}`}
+          onError={() => setHasError(true)}
+        />
+      )}
+    </div>
+  );
+}
 
 function App() {
   const [search, setSearch] = useState(() => {
@@ -66,6 +109,11 @@ function App() {
     const val = params.get('order');
     return val === 'asc' || val === 'desc' ? val : 'asc';
   })
+
+  const [hoveredMap, setHoveredMap] = useState<{name: string, difficulty: string} | null>(null);
+  const [hoverY, setHoverY] = useState<number>(0);
+  const [selectedMap, setSelectedMap] = useState<{name: string, difficulty: string} | null>(null);
+  const hoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -157,6 +205,26 @@ function App() {
     }
   }
 
+  const handleMouseEnter = (e: React.MouseEvent, name: string, difficulty: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = rect.top + rect.height / 2;
+
+    if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
+
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setHoverY(y);
+      setHoveredMap({ name, difficulty });
+    }, 50);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
+
+    // Delay unmounting slightly so user can move mouse to the preview itself
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setHoveredMap(null);
+    }, 100);
+  };
   const stats = useMemo(() => {
     let finished = 0;
     let points = 0;
@@ -287,7 +355,17 @@ function App() {
 
               return (
                 <tr key={map.name} className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}>
-                  <td className="font-bold">{map.name}</td>
+                  <td 
+                    className="font-bold map-cell"
+                    onMouseEnter={(e) => handleMouseEnter(e, map.name, map.difficulty)}
+                    onMouseLeave={handleMouseLeave}
+                    onClick={() => setSelectedMap({ name: map.name, difficulty: map.difficulty })}
+                  >
+                    <div className="map-name-wrapper">
+                      {map.name}
+                      <Maximize2 size={12} className="preview-icon" />
+                    </div>
+                  </td>
                   <td>
                     <span className={`badge badge-${map.difficulty.toLowerCase()}`}>
                       {map.difficulty}
@@ -333,6 +411,29 @@ function App() {
         <div className="empty-state">
           <p>No maps found matching your search.</p>
         </div>
+      )}
+
+      {hoveredMap && !selectedMap && (
+        <div 
+          className="hover-preview-fixed" 
+          style={{ transform: `translate3d(0, ${hoverY}px, 0) translateY(-50%)` }}
+          onMouseEnter={() => {
+            if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
+          }}
+          onMouseLeave={handleMouseLeave}
+          onClick={() => setSelectedMap(hoveredMap)}
+        >
+          <MapPreview mapName={hoveredMap.name} difficulty={hoveredMap.difficulty} />
+        </div>
+      )}
+
+      {selectedMap && (
+        <MapPreview 
+          mapName={selectedMap.name} 
+          difficulty={selectedMap.difficulty}
+          isFull={true} 
+          onClose={() => setSelectedMap(null)} 
+        />
       )}
     </div>
   )
