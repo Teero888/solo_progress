@@ -2,6 +2,10 @@ import os
 import re
 import json
 import urllib.request
+import urllib.parse
+import shutil
+
+BASE_URL = "https://teero888.github.io/solo_progress/"
 
 def load_blacklist():
     blacklist = set()
@@ -13,9 +17,55 @@ def load_blacklist():
                     blacklist.add(line)
     return blacklist
 
+def generate_preview_html(map_info):
+    map_name = map_info["name"]
+    difficulty = map_info["difficulty"]
+    stars = map_info["stars"]
+    points = map_info["points"]
+    creator = map_info["creator"]
+    
+    # Sanitize for HTML attributes
+    safe_name = map_name.replace('"', '&quot;')
+    safe_creator = creator.replace('"', '&quot;')
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{safe_name} - Solo Progress</title>
+    <meta property="og:title" content="{safe_name} - Solo Progress">
+    <meta property="og:description" content="Difficulty: {difficulty} | Stars: {stars} | Points: {points} | Creator: {safe_creator}">
+    <meta property="og:image" content="{BASE_URL}thumbnails/{urllib.parse.quote(map_name)}.png">
+    <meta property="og:url" content="{BASE_URL}preview/{urllib.parse.quote(map_name)}.html">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{safe_name} - Solo Progress">
+    <meta name="twitter:description" content="Difficulty: {difficulty} | Creator: {safe_creator}">
+    <meta name="twitter:image" content="{BASE_URL}thumbnails/{urllib.parse.quote(map_name)}.png">
+    <meta http-equiv="refresh" content="0; url=../index.html?preview={urllib.parse.quote(map_name)}">
+    <script>window.location.href = "../index.html?preview={urllib.parse.quote(map_name)}";</script>
+</head>
+<body style="background: #1a1a1a; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+    <div style="text-align: center;">
+        <h2>Redirecting to map preview for {safe_name}...</h2>
+        <p>If you are not redirected, <a href="../index.html?preview={urllib.parse.quote(map_name)}" style="color: #4a90e2;">click here</a>.</p>
+    </div>
+</body>
+</html>
+"""
+    os.makedirs('public/preview', exist_ok=True)
+    with open(f'public/preview/{map_name}.html', 'w+', encoding='utf-8') as f:
+        f.write(html_content)
+
 def parse_maps():
     maps = []
     blacklist = load_blacklist()
+    
+    # Clear old previews
+    if os.path.exists('public/preview'):
+        shutil.rmtree('public/preview')
+    os.makedirs('public/preview', exist_ok=True)
+    
     try:
         with open('public/maps/mapinfo.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -35,7 +85,7 @@ def parse_maps():
         difficulty = parts[1]
         if difficulty == 'Solo': continue
 
-        maps.append({
+        map_info = {
             "name": map_name,
             "difficulty": difficulty,
             "stars": parts[2],
@@ -44,7 +94,10 @@ def parse_maps():
             "length": parts[4],
             "creator": parts[5],
             "date": parts[6]
-        })
+        }
+        maps.append(map_info)
+        generate_preview_html(map_info)
+        
     return maps
 
 def parse_demos():

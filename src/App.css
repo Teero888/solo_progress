@@ -318,6 +318,47 @@ select:hover {
   color: #f8fafc;
 }
 
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.copied-message {
+  color: #10b981;
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateX(5px); }
+  15% { opacity: 1; transform: translateX(0); }
+  85% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-5px); }
+}
+
+.share-button {
+  background: #3b82f6;
+  border: none;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.share-button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.share-button:active {
+  transform: translateY(0);
+}
+
 .close-button {
   background: transparent;
   border: none;

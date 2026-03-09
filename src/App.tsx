@@ -34,21 +34,51 @@ const VALID_STATUS = ['All', 'Finished', 'Pending'];
 function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName: string, difficulty: string, isFull?: boolean, onClose?: () => void }) {
   const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
   const [hasError, setHasError] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [copyKey, setCopyKey] = useState(0);
+  const timeoutRef = useRef<number | null>(null);
 
   // Reset error state when map changes
   useEffect(() => {
     setHasError(false);
+    setCopied(false);
+    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
   }, [mapName]);
-  
+
   if (isFull) {
     const diffParam = difficulty.toUpperCase();
     const url = `${baseUrl}/map_preview.html?map=${encodeURIComponent(mapName)}&diff=${encodeURIComponent(diffParam)}`;
+
+    const handleShare = () => {
+      const shareUrl = `${window.location.origin}${baseUrl}/preview/${encodeURIComponent(mapName)}.html`;
+      navigator.clipboard.writeText(shareUrl);
+      
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+      
+      setCopied(true);
+      setCopyKey(prev => prev + 1);
+      
+      timeoutRef.current = window.setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    };
+
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h3>{mapName}</h3>
-            <button className="close-button" onClick={onClose}><X size={24} /></button>
+            <div className="modal-actions">
+              {copied && <span key={copyKey} className="copied-message">Copied!</span>}
+              <button 
+                className="share-button" 
+                onClick={handleShare}
+                title="Share"
+              >
+                Share
+              </button>
+              <button className="close-button" onClick={onClose}><X size={24} /></button>
+            </div>
           </div>
           <div className="modal-body">
             <iframe src={url} title={`Map preview: ${mapName}`} />

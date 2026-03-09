@@ -30,3 +30,6 @@ public/mapres_06/*
 !public/mapres_06/*.png
 public/mapres_07/*
 !public/mapres_07/*.png
+
+# embed previews
+public/preview/
