@@ -6,4 +6,4 @@
 	url = https://github.com/Teero888/KoGmaps.git
 [submodule "ddnet"]
 	path = ddnet
-	url = https://github.com/ddnet/ddnet.git
+	url = https://github.com/Teero888/ddnet_web_demo.git

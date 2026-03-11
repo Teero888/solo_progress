@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import mapsData from './data/maps.json'
-import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, PlayCircle } from 'lucide-react'
+import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, PlayCircle, Play, Pause } from 'lucide-react'
 import './App.css'
 
 interface MapEntry {
@@ -30,6 +30,114 @@ const LENGTH_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
 const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
+
+function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void }) {
+  const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (show && pendingDemo && iframeRef.current) {
+      const timer = setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage({
+          type: 'playDemo',
+          demoUrl: pendingDemo.url,
+          demoName: pendingDemo.name
+        }, '*');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [show, pendingDemo]);
+
+  // Use useCallback so we don't recreate the listener on every render
+  const memoizedOnClose = useCallback(onClose, [onClose]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'closeDemoViewer') {
+        if (iframeRef.current) {
+          iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
+        }
+        setDemoState(null);
+        memoizedOnClose();
+      } else if (event.data?.type === 'demoState') {
+        setDemoState(event.data.state);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [memoizedOnClose]);
+
+  if (!hasLoaded) return null;
+
+  const handleClose = () => {
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
+    }
+    setDemoState(null);
+    onClose();
+  };
+
+  return (
+    <div className="modal-overlay" style={{ display: show ? 'flex' : 'none' }} onClick={handleClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Demo Viewer {pendingDemo ? `- ${pendingDemo.name}` : ''}</h3>
+          <div className="modal-actions">
+            <button className="close-button" onClick={handleClose}><X size={24} /></button>
+          </div>
+        </div>
+        <div className="modal-body">
+          <iframe 
+            ref={iframeRef}
+            src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
+            title="DDNet Demo Viewer"
+            allow="fullscreen"
+          />
+          {(demoState || pendingDemo) && (
+            <div className="demo-timeline-controls">
+              <button 
+                className="demo-play-pause"
+                onClick={() => {
+                  if (demoState) {
+                    iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !demoState.isPaused }, '*');
+                  } else if (pendingDemo) {
+                    iframeRef.current?.contentWindow?.postMessage({
+                      type: 'playDemo',
+                      demoUrl: pendingDemo.url,
+                      demoName: pendingDemo.name
+                    }, '*');
+                  }
+                }}
+                style={{ paddingLeft: (demoState && demoState.isPaused) || !demoState ? '3px' : '0' }}
+              >
+                {(demoState && !demoState.isPaused) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+              </button>
+              {demoState ? (
+                <>
+                  <input 
+                    type="range" 
+                    className="demo-scrubber"
+                    min={demoState.firstTick} 
+                    max={demoState.lastTick} 
+                    value={demoState.currentTick}
+                    onChange={(e) => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: parseInt(e.target.value) }, '*')}
+                  />
+                  <div className="demo-speed-controls">
+                    <button onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.max(0.1, demoState.speed - 0.25) }, '*')}>-</button>
+                    <span>{demoState.speed.toFixed(2)}x</span>
+                    <button onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: demoState.speed + 0.25 }, '*')}>+</button>
+                  </div>
+                </>
+              ) : (
+                <div className="demo-loading-text" style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Replay ended or loading...</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName: string, difficulty: string, isFull?: boolean, onClose?: () => void }) {
   const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -141,21 +249,13 @@ function App() {
   })
 
   const [showDemoViewer, setShowDemoViewer] = useState(false);
+  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(false);
   const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => {
-    if (showDemoViewer && pendingDemo && iframeRef.current) {
-      const timer = setTimeout(() => {
-        iframeRef.current?.contentWindow?.postMessage({
-          type: 'playDemo',
-          demoUrl: pendingDemo.url,
-          demoName: pendingDemo.name
-        }, '*');
-      }, 1500); // Give the WASM client some time to initialize
-      return () => clearTimeout(timer);
-    }
-  }, [showDemoViewer, pendingDemo]);
+  const closeViewer = useCallback(() => {
+    setShowDemoViewer(false);
+    setPendingDemo(null);
+  }, []);
 
   const handlePlayDemo = (e: React.MouseEvent, mapName: string, player: string, time: number) => {
     e.stopPropagation();
@@ -163,6 +263,7 @@ function App() {
     const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
     
     setPendingDemo({ url: demoUrl, name: demoName });
+    setHasLoadedDemoViewer(true);
     setShowDemoViewer(true);
   };
 
@@ -336,14 +437,6 @@ function App() {
               <span className="stat-label">Total Points</span>
               <span className="stat-value">{stats.points}</span>
             </div>
-            <button 
-              className="demo-viewer-btn"
-              onClick={() => setShowDemoViewer(true)}
-              title="Open Demo Viewer"
-            >
-              <PlayCircle size={20} />
-              <span>Demo Viewer</span>
-            </button>
           </div>
         </div>
 
@@ -516,26 +609,12 @@ function App() {
         />
       )}
 
-      {showDemoViewer && (
-        <div className="modal-overlay" onClick={() => { setShowDemoViewer(false); setPendingDemo(null); }}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>WebAssembly Demo Viewer {pendingDemo ? `- ${pendingDemo.name}` : ''}</h3>
-              <div className="modal-actions">
-                <button className="close-button" onClick={() => { setShowDemoViewer(false); setPendingDemo(null); }}><X size={24} /></button>
-              </div>
-            </div>
-            <div className="modal-body">
-              <iframe 
-                ref={iframeRef}
-                src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
-                title="DDNet Demo Viewer"
-                allow="fullscreen"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <DemoViewer
+        show={showDemoViewer}
+        hasLoaded={hasLoadedDemoViewer}
+        pendingDemo={pendingDemo}
+        onClose={closeViewer}
+      />
     </div>
   )
 }

@@ -85,7 +85,7 @@ if (ENVIRONMENT_IS_NODE) {
 
 // --pre-jses are emitted after the Module integration code, so that they can
 // refer to Module (if they choose; they can also define Module)
-// include: /tmp/tmp3_ea7ryx.js
+// include: /tmp/tmpd2rv3cpn.js
 if (!Module["expectedDataFileDownloads"]) Module["expectedDataFileDownloads"] = 0;
 
 Module["expectedDataFileDownloads"]++;
@@ -3653,15 +3653,15 @@ Module["expectedDataFileDownloads"]++;
   });
 })();
 
-// end include: /tmp/tmp3_ea7ryx.js
-// include: /tmp/tmpsqfcb3mr.js
+// end include: /tmp/tmpd2rv3cpn.js
+// include: /tmp/tmpk4pzfz02.js
 // All the pre-js content up to here must remain later on, we need to run
 // it.
 if ((typeof ENVIRONMENT_IS_WASM_WORKER != "undefined" && ENVIRONMENT_IS_WASM_WORKER) || (typeof ENVIRONMENT_IS_PTHREAD != "undefined" && ENVIRONMENT_IS_PTHREAD) || (typeof ENVIRONMENT_IS_AUDIO_WORKLET != "undefined" && ENVIRONMENT_IS_AUDIO_WORKLET)) Module["preRun"] = [];
 
 var necessaryPreJSTasks = Module["preRun"].slice();
 
-// end include: /tmp/tmpsqfcb3mr.js
+// end include: /tmp/tmpk4pzfz02.js
 // include: /home/teero/emsdk/upstream/emscripten/src/emrun_prejs.js
 /**
  * @license
@@ -3683,14 +3683,14 @@ if (globalThis.window) {
 }
 
 // end include: /home/teero/emsdk/upstream/emscripten/src/emrun_prejs.js
-// include: /tmp/tmp266ohr_f.js
+// include: /tmp/tmpmasg3yy1.js
 if (!Module["preRun"]) throw "Module.preRun should exist because file support used it; did a pre-js delete it?";
 
 necessaryPreJSTasks.forEach(task => {
   if (Module["preRun"].indexOf(task) < 0) throw "All preRun tasks that exist before user pre-js code should remain after; did you replace Module or modify Module.preRun?";
 });
 
-// end include: /tmp/tmp266ohr_f.js
+// end include: /tmp/tmpmasg3yy1.js
 var arguments_ = [];
 
 var thisProgram = "./this.program";
@@ -17487,7 +17487,22 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  729968: $0 => {
+  729984: () => {
+    if (window.parent) window.parent.postMessage({
+      type: "closeDemoViewer"
+    }, "*");
+  },
+  730067: () => {
+    if (window.parent) window.parent.postMessage({
+      type: "closeDemoViewer"
+    }, "*");
+  },
+  730150: () => {
+    if (window.parent) window.parent.postMessage({
+      type: "closeDemoViewer"
+    }, "*");
+  },
+  730233: $0 => {
     var str = UTF8ToString($0) + "\n\n" + "Abort/Retry/Ignore/AlwaysIgnore? [ariA] :";
     var reply = window.prompt(str, "i");
     if (reply === null) {
@@ -17495,7 +17510,7 @@ var ASM_CONSTS = {
     }
     return reply.length === 1 ? reply.charCodeAt(0) : -1;
   },
-  730183: () => {
+  730448: () => {
     if (typeof (AudioContext) !== "undefined") {
       return true;
     } else if (typeof (webkitAudioContext) !== "undefined") {
@@ -17503,7 +17518,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  730330: () => {
+  730595: () => {
     if ((typeof (navigator.mediaDevices) !== "undefined") && (typeof (navigator.mediaDevices.getUserMedia) !== "undefined")) {
       return true;
     } else if (typeof (navigator.webkitGetUserMedia) !== "undefined") {
@@ -17511,7 +17526,7 @@ var ASM_CONSTS = {
     }
     return false;
   },
-  730564: $0 => {
+  730829: $0 => {
     if (typeof (Module["SDL2"]) === "undefined") {
       Module["SDL2"] = {};
     }
@@ -17535,11 +17550,11 @@ var ASM_CONSTS = {
     }
     return SDL2.audioContext === undefined ? -1 : 0;
   },
-  731116: () => {
+  731381: () => {
     var SDL2 = Module["SDL2"];
     return SDL2.audioContext.sampleRate;
   },
-  731184: ($0, $1, $2, $3) => {
+  731449: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     var have_microphone = function(stream) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -17581,7 +17596,7 @@ var ASM_CONSTS = {
       }, have_microphone, no_microphone);
     }
   },
-  732877: ($0, $1, $2, $3) => {
+  733142: ($0, $1, $2, $3) => {
     var SDL2 = Module["SDL2"];
     SDL2.audio.scriptProcessorNode = SDL2.audioContext["createScriptProcessor"]($1, 0, $0);
     SDL2.audio.scriptProcessorNode["onaudioprocess"] = function(e) {
@@ -17613,7 +17628,7 @@ var ASM_CONSTS = {
       SDL2.audio.silenceTimer = setInterval(silence_callback, ($1 / SDL2.audioContext.sampleRate) * 1e3);
     }
   },
-  734052: ($0, $1) => {
+  734317: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var numChannels = SDL2.capture.currentCaptureBuffer.numberOfChannels;
     for (var c = 0; c < numChannels; ++c) {
@@ -17632,7 +17647,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  734657: ($0, $1) => {
+  734922: ($0, $1) => {
     var SDL2 = Module["SDL2"];
     var buf = $0 >>> 2;
     var numChannels = SDL2.audio.currentOutputBuffer["numberOfChannels"];
@@ -17646,7 +17661,7 @@ var ASM_CONSTS = {
       }
     }
   },
-  735146: $0 => {
+  735411: $0 => {
     var SDL2 = Module["SDL2"];
     if ($0) {
       if (SDL2.capture.silenceTimer !== undefined) {
@@ -17680,7 +17695,7 @@ var ASM_CONSTS = {
       SDL2.audioContext = undefined;
     }
   },
-  736152: ($0, $1, $2) => {
+  736417: ($0, $1, $2) => {
     var w = $0;
     var h = $1;
     var pixels = $2;
@@ -17751,7 +17766,7 @@ var ASM_CONSTS = {
     }
     SDL2.ctx.putImageData(SDL2.image, 0, 0);
   },
-  737618: ($0, $1, $2, $3, $4) => {
+  737883: ($0, $1, $2, $3, $4) => {
     var w = $0;
     var h = $1;
     var hot_x = $2;
@@ -17788,18 +17803,18 @@ var ASM_CONSTS = {
     stringToUTF8(url, urlBuf, url.length + 1);
     return urlBuf;
   },
-  738606: $0 => {
+  738871: $0 => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = UTF8ToString($0);
     }
   },
-  738689: () => {
+  738954: () => {
     if (Module["canvas"]) {
       Module["canvas"].style["cursor"] = "none";
     }
   },
-  738758: () => window.innerWidth,
-  738788: () => window.innerHeight
+  739023: () => window.innerWidth,
+  739053: () => window.innerHeight
 };
 
 // Imports from the Wasm binary.
@@ -17810,6 +17825,24 @@ var _malloc = makeInvalidEarlyAccess("_malloc");
 var _main = Module["_main"] = makeInvalidEarlyAccess("_main");
 
 var _pthread_self = makeInvalidEarlyAccess("_pthread_self");
+
+var _EmscriptenDemoStop = Module["_EmscriptenDemoStop"] = makeInvalidEarlyAccess("_EmscriptenDemoStop");
+
+var _EmscriptenDemoPause = Module["_EmscriptenDemoPause"] = makeInvalidEarlyAccess("_EmscriptenDemoPause");
+
+var _EmscriptenDemoSetSpeed = Module["_EmscriptenDemoSetSpeed"] = makeInvalidEarlyAccess("_EmscriptenDemoSetSpeed");
+
+var _EmscriptenDemoSetPos = Module["_EmscriptenDemoSetPos"] = makeInvalidEarlyAccess("_EmscriptenDemoSetPos");
+
+var _EmscriptenDemoIsPaused = Module["_EmscriptenDemoIsPaused"] = makeInvalidEarlyAccess("_EmscriptenDemoIsPaused");
+
+var _EmscriptenDemoGetSpeed = Module["_EmscriptenDemoGetSpeed"] = makeInvalidEarlyAccess("_EmscriptenDemoGetSpeed");
+
+var _EmscriptenDemoGetFirstTick = Module["_EmscriptenDemoGetFirstTick"] = makeInvalidEarlyAccess("_EmscriptenDemoGetFirstTick");
+
+var _EmscriptenDemoGetCurrentTick = Module["_EmscriptenDemoGetCurrentTick"] = makeInvalidEarlyAccess("_EmscriptenDemoGetCurrentTick");
+
+var _EmscriptenDemoGetLastTick = Module["_EmscriptenDemoGetLastTick"] = makeInvalidEarlyAccess("_EmscriptenDemoGetLastTick");
 
 var _EmscriptenCallbackQuit = Module["_EmscriptenCallbackQuit"] = makeInvalidEarlyAccess("_EmscriptenCallbackQuit");
 
@@ -18060,6 +18093,15 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports["malloc"] != "undefined", "missing Wasm export: malloc");
   assert(typeof wasmExports["__main_argc_argv"] != "undefined", "missing Wasm export: __main_argc_argv");
   assert(typeof wasmExports["pthread_self"] != "undefined", "missing Wasm export: pthread_self");
+  assert(typeof wasmExports["EmscriptenDemoStop"] != "undefined", "missing Wasm export: EmscriptenDemoStop");
+  assert(typeof wasmExports["EmscriptenDemoPause"] != "undefined", "missing Wasm export: EmscriptenDemoPause");
+  assert(typeof wasmExports["EmscriptenDemoSetSpeed"] != "undefined", "missing Wasm export: EmscriptenDemoSetSpeed");
+  assert(typeof wasmExports["EmscriptenDemoSetPos"] != "undefined", "missing Wasm export: EmscriptenDemoSetPos");
+  assert(typeof wasmExports["EmscriptenDemoIsPaused"] != "undefined", "missing Wasm export: EmscriptenDemoIsPaused");
+  assert(typeof wasmExports["EmscriptenDemoGetSpeed"] != "undefined", "missing Wasm export: EmscriptenDemoGetSpeed");
+  assert(typeof wasmExports["EmscriptenDemoGetFirstTick"] != "undefined", "missing Wasm export: EmscriptenDemoGetFirstTick");
+  assert(typeof wasmExports["EmscriptenDemoGetCurrentTick"] != "undefined", "missing Wasm export: EmscriptenDemoGetCurrentTick");
+  assert(typeof wasmExports["EmscriptenDemoGetLastTick"] != "undefined", "missing Wasm export: EmscriptenDemoGetLastTick");
   assert(typeof wasmExports["EmscriptenCallbackQuit"] != "undefined", "missing Wasm export: EmscriptenCallbackQuit");
   assert(typeof wasmExports["EmscriptenCallbackDropFile"] != "undefined", "missing Wasm export: EmscriptenCallbackDropFile");
   assert(typeof wasmExports["strerror"] != "undefined", "missing Wasm export: strerror");
@@ -18185,6 +18227,15 @@ function assignWasmExports(wasmExports) {
   _malloc = createExportWrapper("malloc", 1);
   _main = Module["_main"] = createExportWrapper("__main_argc_argv", 2);
   _pthread_self = createExportWrapper("pthread_self", 0);
+  _EmscriptenDemoStop = Module["_EmscriptenDemoStop"] = createExportWrapper("EmscriptenDemoStop", 0);
+  _EmscriptenDemoPause = Module["_EmscriptenDemoPause"] = createExportWrapper("EmscriptenDemoPause", 1);
+  _EmscriptenDemoSetSpeed = Module["_EmscriptenDemoSetSpeed"] = createExportWrapper("EmscriptenDemoSetSpeed", 1);
+  _EmscriptenDemoSetPos = Module["_EmscriptenDemoSetPos"] = createExportWrapper("EmscriptenDemoSetPos", 1);
+  _EmscriptenDemoIsPaused = Module["_EmscriptenDemoIsPaused"] = createExportWrapper("EmscriptenDemoIsPaused", 0);
+  _EmscriptenDemoGetSpeed = Module["_EmscriptenDemoGetSpeed"] = createExportWrapper("EmscriptenDemoGetSpeed", 0);
+  _EmscriptenDemoGetFirstTick = Module["_EmscriptenDemoGetFirstTick"] = createExportWrapper("EmscriptenDemoGetFirstTick", 0);
+  _EmscriptenDemoGetCurrentTick = Module["_EmscriptenDemoGetCurrentTick"] = createExportWrapper("EmscriptenDemoGetCurrentTick", 0);
+  _EmscriptenDemoGetLastTick = Module["_EmscriptenDemoGetLastTick"] = createExportWrapper("EmscriptenDemoGetLastTick", 0);
   _EmscriptenCallbackQuit = Module["_EmscriptenCallbackQuit"] = createExportWrapper("EmscriptenCallbackQuit", 0);
   _EmscriptenCallbackDropFile = Module["_EmscriptenCallbackDropFile"] = createExportWrapper("EmscriptenCallbackDropFile", 1);
   _strerror = createExportWrapper("strerror", 1);

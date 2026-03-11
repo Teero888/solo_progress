@@ -36,24 +36,75 @@
 		<div id="output"></div>
 		<canvas id="canvas">Canvas not supported.</canvas>
 		<script>
+			var moduleIsReady = false;
+			var pendingDemoMessage = null;
+
+			window.addEventListener('keydown', function(e) {
+				if (e.key === 'Escape' || e.keyCode === 27) {
+					e.preventDefault();
+					e.stopPropagation();
+					window.parent.postMessage({ type: 'closeDemoViewer' }, '*');
+				}
+			}, true);
+
+			async function doPlayDemo(demoUrl, demoName) {
+				try {
+					const response = await fetch(demoUrl);
+					if (!response.ok) throw new Error('Failed to fetch demo');
+					const buffer = await response.arrayBuffer();
+					const data = new Uint8Array(buffer);
+					FS.writeFile(`/${demoName}`, data);
+					Module.ccall('EmscriptenCallbackDropFile', null, ['string'], [`/${demoName}`]);
+				} catch (e) {
+					console.error(e);
+					alert("Failed to load demo: " + e.message);
+					window.parent.postMessage({ type: 'closeDemoViewer' }, '*');
+				}
+			}
+
 			window.addEventListener('message', async (event) => {
 				if (event.data && event.data.type === 'playDemo') {
-					try {
-						const response = await fetch(event.data.demoUrl);
-						if (!response.ok) throw new Error('Failed to fetch demo');
-						const buffer = await response.arrayBuffer();
-						const data = new Uint8Array(buffer);
-						const dropPath = "/home/web_user/.local/share/ddnet/demos";
-						const fileName = event.data.demoName;
-						FS.createPath(dropPath, "upload", true, true);
-						FS.writeFile(`${dropPath}/upload/${fileName}`, data);
-						Module.ccall('EmscriptenCallbackDropFile', null, ['string'], [`${dropPath}/upload/${fileName}`]);
-					} catch (e) {
-						console.error(e);
-						alert("Failed to load demo: " + e.message);
+					if (moduleIsReady) {
+						doPlayDemo(event.data.demoUrl, event.data.demoName);
+					} else {
+						pendingDemoMessage = event.data;
 					}
+				} else if (event.data && event.data.type === 'stopDemo') {
+					if (moduleIsReady) Module.ccall('EmscriptenDemoStop', null, [], []);
+				} else if (event.data && event.data.type === 'pauseDemo') {
+					if (moduleIsReady) Module.ccall('EmscriptenDemoPause', null, ['number'], [event.data.pause ? 1 : 0]);
+				} else if (event.data && event.data.type === 'setDemoSpeed') {
+					if (moduleIsReady) Module.ccall('EmscriptenDemoSetSpeed', null, ['number'], [event.data.speed]);
+				} else if (event.data && event.data.type === 'setDemoPos') {
+					if (moduleIsReady) Module.ccall('EmscriptenDemoSetPos', null, ['number'], [event.data.tick]);
 				}
 			});
+
+			let lastPoll = 0;
+			function pollDemoState(timestamp) {
+				if (moduleIsReady && Module._EmscriptenDemoGetCurrentTick) {
+					if (timestamp - lastPoll > 100) {
+						lastPoll = timestamp;
+						try {
+							const currentTick = Module.ccall('EmscriptenDemoGetCurrentTick', 'number', [], []);
+							if (currentTick >= 0) { // Only send state if a demo is actually playing
+								const isPaused = Module.ccall('EmscriptenDemoIsPaused', 'number', [], []);
+								const speed = Module.ccall('EmscriptenDemoGetSpeed', 'number', [], []);
+								const firstTick = Module.ccall('EmscriptenDemoGetFirstTick', 'number', [], []);
+								const lastTick = Module.ccall('EmscriptenDemoGetLastTick', 'number', [], []);
+								
+								window.parent.postMessage({
+									type: 'demoState',
+									state: { isPaused, speed, firstTick, currentTick, lastTick }
+								}, '*');
+							}
+						} catch(e) {}
+					}
+				}
+				requestAnimationFrame(pollDemoState);
+			}
+			requestAnimationFrame(pollDemoState);
+
 			var output = document.getElementById('output');
 			function appendOutput(message, bold, textColor, borderColor) {
 				const span = document.createElement("span");
@@ -82,6 +133,13 @@
 				return { color: `rgb(${r}, ${g}, ${b})`, message: message };
 			}
 			var Module = {
+				onRuntimeInitialized: function() {
+					moduleIsReady = true;
+					if (pendingDemoMessage) {
+						doPlayDemo(pendingDemoMessage.demoUrl, pendingDemoMessage.demoName);
+						pendingDemoMessage = null;
+					}
+				},
 				print: function(text) {
 					const parsedLine = parseAnsiColorRgb(text);
 					console.log(parsedLine.message);
