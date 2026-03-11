@@ -1,0 +1,17 @@
+# make sure to use emsdk version 4.0.22 else it wont work
+
+unset CXX && unset CC
+
+scripts/compile_libs/gen_libs.sh build-webasm-libs webasm
+
+find ddnet-libs -type d -name webasm -exec rm -r {} + -prune
+cp -r build-webasm-libs/ddnet-libs/. ddnet-libs/
+
+mkdir build
+cd build
+
+emcmake cmake .. -G "Unix Makefiles" -DVIDEORECORDER=OFF -DVULKAN=OFF -DSERVER=OFF -DTOOLS=OFF -DPREFER_BUNDLED_LIBS=ON -DCMAKE_BUILD_TYPE=Debug
+
+cmake --build . -j8
+
+emrun --broswer firefox DDNet.html
