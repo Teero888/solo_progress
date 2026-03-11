@@ -72,6 +72,27 @@
   color: #f8fafc;
 }
 
+.demo-viewer-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #3b82f6;
+  border: none;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 100%;
+}
+
+.demo-viewer-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
 .controls {
   display: flex;
   gap: 1rem;
@@ -466,6 +487,26 @@ select:hover {
   color: #94a3b8;
   font-family: ui-monospace, monospace;
   font-size: 0.7rem;
+}
+
+.play-demo-btn {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: all 0.2s;
+}
+
+.play-demo-btn:hover {
+  opacity: 1;
+  color: #60a5fa;
+  transform: scale(1.1);
 }
 
 .more-count {

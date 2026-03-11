@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import mapsData from './data/maps.json'
-import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2 } from 'lucide-react'
+import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, PlayCircle } from 'lucide-react'
 import './App.css'
 
 interface MapEntry {
@@ -139,6 +139,32 @@ function App() {
     const val = params.get('order');
     return val === 'asc' || val === 'desc' ? val : 'asc';
   })
+
+  const [showDemoViewer, setShowDemoViewer] = useState(false);
+  const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    if (showDemoViewer && pendingDemo && iframeRef.current) {
+      const timer = setTimeout(() => {
+        iframeRef.current?.contentWindow?.postMessage({
+          type: 'playDemo',
+          demoUrl: pendingDemo.url,
+          demoName: pendingDemo.name
+        }, '*');
+      }, 1500); // Give the WASM client some time to initialize
+      return () => clearTimeout(timer);
+    }
+  }, [showDemoViewer, pendingDemo]);
+
+  const handlePlayDemo = (e: React.MouseEvent, mapName: string, player: string, time: number) => {
+    e.stopPropagation();
+    const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
+    const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
+    
+    setPendingDemo({ url: demoUrl, name: demoName });
+    setShowDemoViewer(true);
+  };
 
   const [hoveredMap, setHoveredMap] = useState<{name: string, difficulty: string} | null>(null);
   const [hoverY, setHoverY] = useState<number>(0);
@@ -310,6 +336,14 @@ function App() {
               <span className="stat-label">Total Points</span>
               <span className="stat-value">{stats.points}</span>
             </div>
+            <button 
+              className="demo-viewer-btn"
+              onClick={() => setShowDemoViewer(true)}
+              title="Open Demo Viewer"
+            >
+              <PlayCircle size={20} />
+              <span>Demo Viewer</span>
+            </button>
           </div>
         </div>
 
@@ -430,6 +464,13 @@ function App() {
                               {idx === 0 && <Trophy size={10} className="icon-gold" />}
                               <span className="finisher-name">{player}</span>
                               <span className="finisher-time">{formatTime(time)}</span>
+                              <button 
+                                className="play-demo-btn" 
+                                onClick={(e) => handlePlayDemo(e, map.name, player, time)}
+                                title="Play Demo"
+                              >
+                                <PlayCircle size={12} />
+                              </button>
                             </div>
                           ))}
                           {leaderboard.length > 3 && <span className="more-count">+{leaderboard.length - 3} more</span>}
@@ -473,6 +514,27 @@ function App() {
           isFull={true} 
           onClose={() => setSelectedMap(null)} 
         />
+      )}
+
+      {showDemoViewer && (
+        <div className="modal-overlay" onClick={() => { setShowDemoViewer(false); setPendingDemo(null); }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>WebAssembly Demo Viewer {pendingDemo ? `- ${pendingDemo.name}` : ''}</h3>
+              <div className="modal-actions">
+                <button className="close-button" onClick={() => { setShowDemoViewer(false); setPendingDemo(null); }}><X size={24} /></button>
+              </div>
+            </div>
+            <div className="modal-body">
+              <iframe 
+                ref={iframeRef}
+                src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
+                title="DDNet Demo Viewer"
+                allow="fullscreen"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
