@@ -33,12 +33,11 @@ const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
 const SKIP_OPTIONS = [0.5, 1, 2, 5, 10];
 
-function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void }) {
+function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void, iframeRef: React.RefObject<HTMLIFrameElement> }) {
   const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [skipInterval, setSkipInterval] = useState(5);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   const scrubberRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +89,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
 
   useEffect(() => {
     if (show && pendingDemo && iframeRef.current) {
+      try { (iframeRef.current.contentWindow as any)?.resumeAudio?.(); } catch(e) {}
+
       const timer = setTimeout(() => {
+        try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch(e) {}
         iframeRef.current?.contentWindow?.postMessage({
           type: 'playDemo',
           demoUrl: pendingDemo.url,
@@ -141,9 +143,12 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!show) return;
-      if (e.key === ' ' || e.keyCode === 32) {
+      if (e.key === 'Escape' || e.keyCode === 27) {
         e.preventDefault();
-        if (stateRef.current) {
+        handleClose();
+      } else if (e.key === ' ' || e.keyCode === 32) {
+        e.preventDefault();
+        if (stateRef.current && !e.repeat) {
           iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !stateRef.current.isPaused }, '*');
         }
       } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
@@ -243,19 +248,45 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
 
   if (!hasLoaded) return null;
 
+  const [viewerKey, setViewerKey] = useState(0);
+
   const handleClose = () => {
     if (iframeRef.current) {
       iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
     }
     setDemoState(null);
     onClose();
+    // Increment key to force iframe to re-mount and clean up WASM state
+    setViewerKey(prev => prev + 1);
+  };
+
+  const handleOverlayMouseDown = (e: React.MouseEvent) => {
+    // We only care if the click started directly on the overlay
+    if (e.target === e.currentTarget) {
+      (e.currentTarget as any)._startedOnOverlay = true;
+    } else {
+      (e.currentTarget as any)._startedOnOverlay = false;
+    }
+  };
+
+  const handleOverlayMouseUp = (e: React.MouseEvent) => {
+    // Only close if it both started and ended on the overlay
+    if (e.target === e.currentTarget && (e.currentTarget as any)._startedOnOverlay) {
+      handleClose();
+    }
+    (e.currentTarget as any)._startedOnOverlay = false;
   };
 
   const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
 
   return (
-    <div className="modal-overlay" style={{ display: show ? 'flex' : 'none' }} onClick={handleClose}>
-      <div className="modal-content demo-viewer-content" ref={containerRef} onClick={e => e.stopPropagation()}>
+    <div 
+      className="modal-overlay" 
+      style={{ display: show ? 'flex' : 'none' }} 
+      onMouseDown={handleOverlayMouseDown}
+      onMouseUp={handleOverlayMouseUp}
+    >
+      <div className="modal-content demo-viewer-content" ref={containerRef}>
         <div className="modal-header demo-viewer-header">
           <div className="header-info">
             <PlayCircle size={18} className="text-blue" />
@@ -268,10 +299,11 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
         </div>
         <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer} onClick={toggleControls}>
           <iframe 
+            key={viewerKey}
             ref={iframeRef}
             src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
             title="DDNet Demo Viewer"
-            allow="fullscreen"
+            allow="fullscreen; autoplay"
             style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
           />
           
@@ -488,10 +520,7 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     return !!params.get('demo');
   });
-  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return !!params.get('demo');
-  });
+  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(true);
   const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const demoName = params.get('demo');
@@ -501,6 +530,8 @@ function App() {
     }
     return null;
   });
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const closeViewer = useCallback(() => {
     setShowDemoViewer(false);
@@ -512,8 +543,10 @@ function App() {
     const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
     const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
     
+    // Resume audio immediately within the user gesture
+    try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch(err) {}
+
     setPendingDemo({ url: demoUrl, name: demoName });
-    setHasLoadedDemoViewer(true);
     setShowDemoViewer(true);
   };
 
@@ -865,6 +898,7 @@ function App() {
         hasLoaded={hasLoadedDemoViewer}
         pendingDemo={pendingDemo}
         onClose={closeViewer}
+        iframeRef={iframeRef}
       />
     </div>
   )

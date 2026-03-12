@@ -46,9 +46,9 @@
 				e.stopImmediatePropagation();
 				
 				if (e.key === 'Escape' || e.keyCode === 27) {
-					window.parent.postMessage({ type: 'closeDemoViewer' }, '*');
+					if (!e.repeat) window.parent.postMessage({ type: 'closeDemoViewer' }, '*');
 				} else if (e.key === ' ' || e.keyCode === 32) {
-					window.parent.postMessage({ type: 'togglePause' }, '*');
+					if (!e.repeat) window.parent.postMessage({ type: 'togglePause' }, '*');
 				} else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
 					window.parent.postMessage({ type: 'skip', direction: -1 }, '*');
 				} else if (e.key === 'ArrowRight' || e.keyCode === 39) {
@@ -66,6 +66,19 @@
 			window.addEventListener('keypress', e => { e.stopImmediatePropagation(); e.preventDefault(); }, true);
 
 			const inputOverlay = document.getElementById('input-overlay');
+			
+			function resumeAudio() {
+				if (typeof Module !== 'undefined' && Module.SDL2 && Module.SDL2.audioContext) {
+					if (Module.SDL2.audioContext.state === 'suspended') {
+						Module.SDL2.audioContext.resume().then(() => {
+							console.log("AudioContext resumed successfully");
+						}).catch(e => {
+							console.error("Failed to resume AudioContext:", e);
+						});
+					}
+				}
+			}
+
 			inputOverlay.addEventListener('mousedown', () => {
 				window.parent.postMessage({ type: 'canvasClick' }, '*');
 			});
@@ -170,6 +183,7 @@
 			var Module = {
 				onRuntimeInitialized: function() {
 					moduleIsReady = true;
+					resumeAudio();
 					if (pendingDemoMessage) {
 						doPlayDemo(pendingDemoMessage.demoUrl, pendingDemoMessage.demoName);
 						pendingDemoMessage = null;
