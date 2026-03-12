@@ -56,7 +56,7 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
 
   const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
   const isFinished = Object.keys(mapProgress).length > 0;
-  
+
   // Sort leaderboard
   const leaderboard = useMemo(() => Object.entries(mapProgress)
     .sort(([, a], [, b]) => a - b), [mapProgress]);
@@ -65,10 +65,10 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
     if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
     const rect = e.currentTarget.getBoundingClientRect();
     setHoverY(rect.top + rect.height / 2);
-    
+
     globalZIndex++;
     setZIndex(globalZIndex);
-    
+
     setIsMounted(true);
     // Use requestAnimationFrame or setTimeout(0) to ensure the mount is processed before triggering the show animation
     requestAnimationFrame(() => {
@@ -90,10 +90,10 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
   }, []);
 
   return (
-    <tr 
+    <tr
       className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
     >
-      <td 
+      <td
         className="font-bold map-cell"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -104,8 +104,8 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
           <Maximize2 size={12} className="preview-icon" />
         </div>
         {isMounted && (
-          <div 
-            className={`map-row-preview ${isShowing ? 'visible' : ''}`} 
+          <div
+            className={`map-row-preview ${isShowing ? 'visible' : ''}`}
             style={{ top: hoverY, zIndex }}
           >
             <MapPreview mapName={map.name} difficulty={map.difficulty} />
@@ -130,15 +130,15 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
                 <span className="time-display highlight">{formatTime(playerTime)}</span>
               </div>
             ) : null}
-            
+
             <div className="top-finishers">
               {leaderboard.slice(0, 3).map(([player, time], idx) => (
                 <div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
                   {idx === 0 && <Trophy size={10} className="icon-gold" />}
                   <span className="finisher-name">{player}</span>
                   <span className="finisher-time">{formatTime(time)}</span>
-                  <button 
-                    className="play-demo-btn" 
+                  <button
+                    className="play-demo-btn"
                     onClick={(e) => onPlayDemo(e, map.name, player, time)}
                     title="Play Demo"
                   >
@@ -158,7 +158,7 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
 });
 
 function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void, iframeRef: React.RefObject<HTMLIFrameElement | null> }) {
-  const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
+  const [demoState, setDemoState] = useState<{ isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number } | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [skipInterval, setSkipInterval] = useState(5);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -181,16 +181,16 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!pendingDemo) return;
-    
+
     const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
     const shareUrl = `${window.location.origin}${baseUrl}/?demo=${encodeURIComponent(pendingDemo.name)}`;
     navigator.clipboard.writeText(shareUrl);
-    
+
     if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
-    
+
     setCopied(true);
     setCopyKey(prev => prev + 1);
-    
+
     shareTimeoutRef.current = window.setTimeout(() => {
       setCopied(false);
     }, 2000);
@@ -221,7 +221,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   // Use a ref to access the latest state in the event listener without re-attaching it
   const stateRef = useRef(demoState);
   const skipIntervalRef = useRef(skipInterval);
-  
+
   useEffect(() => {
     stateRef.current = demoState;
   }, [demoState]);
@@ -247,10 +247,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
 
   useEffect(() => {
     if (show && pendingDemo && iframeRef.current) {
-      try { (iframeRef.current.contentWindow as any)?.resumeAudio?.(); } catch(e) {}
+      try { (iframeRef.current.contentWindow as any)?.resumeAudio?.(); } catch (e) { }
 
       const timer = setTimeout(() => {
-        try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch(e) {}
+        try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch (e) { }
         iframeRef.current?.contentWindow?.postMessage({
           type: 'playDemo',
           demoUrl: pendingDemo.url,
@@ -293,14 +293,14 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
         }
       } else if (event.data?.type === 'skip') {
         if (stateRef.current) {
-          const skipTicks = skipIntervalRef.current * 50; 
+          const skipTicks = skipIntervalRef.current * 50;
           const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + (event.data.direction * skipTicks)));
           iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
         }
       } else if (event.data?.type === 'changeSpeed') {
         if (stateRef.current) {
-          const newSpeed = event.data.direction > 0 ? 
-            Math.min(10.0, stateRef.current.speed + 0.25) : 
+          const newSpeed = event.data.direction > 0 ?
+            Math.min(10.0, stateRef.current.speed + 0.25) :
             Math.max(0.25, stateRef.current.speed - 0.25);
           iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
         }
@@ -379,7 +379,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
 
   const toggleControls = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
-    
+
     // Toggle play/pause on click inside the viewer body
     if (demoState) {
       const newPaused = !demoState.isPaused;
@@ -464,9 +464,9 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
 
   return (
-    <div 
-      className="modal-overlay" 
-      style={{ display: show ? 'flex' : 'none' }} 
+    <div
+      className="modal-overlay"
+      style={{ display: show ? 'flex' : 'none' }}
       onMouseDown={handleOverlayMouseDown}
       onMouseUp={handleOverlayMouseUp}
     >
@@ -479,8 +479,8 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
           </div>
           <div className="modal-actions">
             {copied && <span key={copyKey} className="copied-message">Copied!</span>}
-            <button 
-              className="share-button" 
+            <button
+              className="share-button"
               onClick={handleShare}
               title="Share Demo"
             >
@@ -490,10 +490,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
           </div>
         </div>
         <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer} onClick={toggleControls}>
-          <iframe 
+          <iframe
             key={viewerKey}
             ref={iframeRef}
-            src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
+            src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`}
             title="DDNet Demo Viewer"
             allow="fullscreen; autoplay"
             style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
@@ -504,11 +504,11 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
               {playIndicator === 'play' ? <Play size={40} fill="white" /> : <Pause size={40} fill="white" />}
             </div>
           )}
-          
+
           <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }} onClick={e => e.stopPropagation()}>
             {demoState && (
-              <div 
-                className="demo-scrubber-wrapper" 
+              <div
+                className="demo-scrubber-wrapper"
                 ref={scrubberRef}
                 onMouseDown={onMouseDown}
                 onTouchStart={onTouchStart}
@@ -520,10 +520,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                 </div>
               </div>
             )}
-            
+
             <div className="demo-controls-bar">
               <div className="controls-left">
-                <button 
+                <button
                   className="demo-play-pause"
                   onClick={() => {
                     if (demoState) {
@@ -537,9 +537,9 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                     }
                   }}
                 >
-                  {(demoState && !demoState.isPaused) ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{marginLeft: '2px'}} />}
+                  {(demoState && !demoState.isPaused) ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: '2px' }} />}
                 </button>
-                
+
                 {demoState && (
                   <div className="demo-time-display">
                     <span className="current">{formatTick(demoState.currentTick - demoState.firstTick)}</span>
@@ -563,7 +563,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                       </select>
                     </div>
                     <div className="demo-speed-selector">
-                      <button 
+                      <button
                         className="speed-btn"
                         onClick={() => {
                           const newSpeed = Math.max(0.25, demoState.speed - 0.25);
@@ -576,7 +576,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                         <Clock size={14} />
                         <span>{demoState.speed.toFixed(2)}x</span>
                       </div>
-                      <button 
+                      <button
                         className="speed-btn"
                         onClick={() => {
                           const newSpeed = Math.min(10.0, demoState.speed + 0.25);
@@ -588,10 +588,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                     </div>
                   </>
                 )}
-                
-                <button 
-                  className="maximize-btn" 
-                  onClick={toggleFullscreen} 
+
+                <button
+                  className="maximize-btn"
+                  onClick={toggleFullscreen}
                   title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
                 >
                   {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
@@ -617,10 +617,10 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
   // Preload and manage thumbnail
   useEffect(() => {
     if (isFull) return;
-    
+
     setIsLoading(true);
     setHasError(false);
-    
+
     const url = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
     const img = new Image();
     img.src = url;
@@ -662,12 +662,12 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
     const handleShare = () => {
       const shareUrl = `${window.location.origin}${baseUrl}/preview/${encodeURIComponent(mapName)}.html`;
       navigator.clipboard.writeText(shareUrl);
-      
+
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-      
+
       setCopied(true);
       setCopyKey(prev => prev + 1);
-      
+
       timeoutRef.current = window.setTimeout(() => {
         setCopied(false);
       }, 2000);
@@ -680,8 +680,8 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
             <h3>{mapName}</h3>
             <div className="modal-actions">
               {copied && <span key={copyKey} className="copied-message">Copied!</span>}
-              <button 
-                className="share-button" 
+              <button
+                className="share-button"
                 onClick={handleShare}
                 title="Share"
               >
@@ -703,8 +703,8 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
       {hasError ? (
         <span className="hover-preview-loading">No preview available</span>
       ) : (
-        <img 
-          src={imgSrc || `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`} 
+        <img
+          src={imgSrc || `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`}
           alt={`Map preview: ${mapName}`}
           className={isLoading ? 'loading' : ''}
         />
@@ -754,7 +754,7 @@ function App() {
     return !!params.get('demo');
   });
   const hasLoadedDemoViewer = true;
-  const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(() => {
+  const [pendingDemo, setPendingDemo] = useState<{ url: string, name: string } | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const demoName = params.get('demo');
     if (demoName) {
@@ -775,15 +775,15 @@ function App() {
     e.stopPropagation();
     const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
     const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
-    
+
     // Resume audio immediately within the user gesture
-    try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch(err) {}
+    try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch (err) { }
 
     setPendingDemo({ url: demoUrl, name: demoName });
     setShowDemoViewer(true);
   }, []);
 
-  const [selectedMap, setSelectedMap] = useState<{name: string, difficulty: string} | null>(() => {
+  const [selectedMap, setSelectedMap] = useState<{ name: string, difficulty: string } | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const mapName = params.get('preview');
     if (mapName) {
@@ -825,20 +825,20 @@ function App() {
   const filteredMaps = useMemo(() => {
     return data.maps
       .filter(m => {
-        const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) || 
-                             m.creator.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
+          m.creator.toLowerCase().includes(search.toLowerCase());
         const matchesDiff = diffFilter === 'All' || m.difficulty === diffFilter;
         const matchesLength = lengthFilter === 'All' || m.length === lengthFilter;
-        
+
         const mapProgress = data.progress[m.name] || {};
-        const isFinishedByCurrent = currentPlayer === 'All Players' 
-          ? Object.keys(mapProgress).length > 0 
+        const isFinishedByCurrent = currentPlayer === 'All Players'
+          ? Object.keys(mapProgress).length > 0
           : !!mapProgress[currentPlayer];
 
-        const matchesStatus = statusFilter === 'All' || 
-                             (statusFilter === 'Finished' && isFinishedByCurrent) || 
-                             (statusFilter === 'Pending' && !isFinishedByCurrent);
-        
+        const matchesStatus = statusFilter === 'All' ||
+          (statusFilter === 'Finished' && isFinishedByCurrent) ||
+          (statusFilter === 'Pending' && !isFinishedByCurrent);
+
         return matchesSearch && matchesDiff && matchesLength && matchesStatus;
       })
       .sort((a, b) => {
@@ -858,11 +858,11 @@ function App() {
           valA = a[sortField];
           valB = b[sortField];
         }
-        
+
         if (typeof valA === 'string' && typeof valB === 'string') {
           return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
         }
-        
+
         // Handle Infinity for sorting unfinished maps to bottom
         if (valA === valB) return 0;
         const res = valA > valB ? 1 : -1;
@@ -883,17 +883,17 @@ function App() {
     let finished = 0;
     let points = 0;
     let total = 0;
-    
+
     data.maps.forEach(m => {
       if (diffFilter !== 'All' && m.difficulty !== diffFilter) return;
       if (lengthFilter !== 'All' && m.length !== lengthFilter) return;
-      
+
       total++;
       const mapProgress = data.progress[m.name] || {};
-      const isFinished = currentPlayer === 'All Players' 
-        ? Object.keys(mapProgress).length > 0 
+      const isFinished = currentPlayer === 'All Players'
+        ? Object.keys(mapProgress).length > 0
         : !!mapProgress[currentPlayer];
-      
+
       if (isFinished) {
         finished++;
         points += m.points;
@@ -931,14 +931,14 @@ function App() {
         <div className="controls">
           <div className="search-wrapper">
             <Search className="search-icon" size={18} />
-            <input 
-              type="text" 
-              placeholder="Search maps or creators..." 
+            <input
+              type="text"
+              placeholder="Search maps or creators..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          
+
           <div className="filters">
             <div className="filter-group">
               <Users size={16} />
@@ -975,31 +975,31 @@ function App() {
           <thead>
             <tr>
               <th onClick={() => toggleSort('name')} className="sortable">
-                <MapIcon size={16} /> Map {sortField === 'name' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                <MapIcon size={16} /> Map {sortField === 'name' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('difficulty')} className="sortable">
-                Difficulty {sortField === 'difficulty' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                Difficulty {sortField === 'difficulty' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('stars_count')} className="sortable">
-                <Star size={16} /> Stars {sortField === 'stars_count' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                <Star size={16} /> Stars {sortField === 'stars_count' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('points')} className="sortable">
-                Points {sortField === 'points' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                Points {sortField === 'points' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('length')} className="sortable">
-                Length {sortField === 'length' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                Length {sortField === 'length' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('creator')} className="sortable">
-                <User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                <User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('time')} className="sortable">
-                <Clock size={16} /> Time / Leaderboard {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14}/> : <SortDesc size={14}/>)}
+                <Clock size={16} /> Time / Leaderboard {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
             </tr>
           </thead>
           <tbody>
             {filteredMaps.map(map => (
-              <MapRow 
+              <MapRow
                 key={map.name}
                 map={map}
                 mapProgress={data.progress[map.name] || {}}
@@ -1011,7 +1011,7 @@ function App() {
           </tbody>
         </table>
       </main>
-      
+
       {filteredMaps.length === 0 && (
         <div className="empty-state">
           <p>No maps found matching your search.</p>
@@ -1022,8 +1022,8 @@ function App() {
         <MapPreview
           mapName={selectedMap.name}
           difficulty={selectedMap.difficulty}
-          isFull={true} 
-          onClose={() => setSelectedMap(null)} 
+          isFull={true}
+          onClose={() => setSelectedMap(null)}
         />
       )}
       <DemoViewer
