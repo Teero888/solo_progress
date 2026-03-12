@@ -882,6 +882,7 @@ function App() {
   const stats = useMemo(() => {
     let finished = 0;
     let points = 0;
+    let maxPoints = 0;
     let total = 0;
 
     data.maps.forEach(m => {
@@ -889,6 +890,7 @@ function App() {
       if (lengthFilter !== 'All' && m.length !== lengthFilter) return;
 
       total++;
+      maxPoints += m.points;
       const mapProgress = data.progress[m.name] || {};
       const isFinished = currentPlayer === 'All Players'
         ? Object.keys(mapProgress).length > 0
@@ -904,7 +906,8 @@ function App() {
       finished,
       total,
       percent: total > 0 ? ((finished / total) * 100).toFixed(1) : '0.0',
-      points
+      points,
+      maxPoints
     }
   }, [currentPlayer, diffFilter, lengthFilter]);
 
@@ -923,7 +926,7 @@ function App() {
             </div>
             <div className="stat-card">
               <span className="stat-label">Total Points</span>
-              <span className="stat-value">{stats.points}</span>
+              <span className="stat-value">{stats.points} / {stats.maxPoints}</span>
             </div>
           </div>
         </div>
