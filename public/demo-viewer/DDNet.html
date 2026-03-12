@@ -44,27 +44,47 @@
 			var pendingDemoMessage = null;
 
 			window.addEventListener('keydown', function(e) {
-				e.stopImmediatePropagation();
-				
 				if (e.key === 'Escape' || e.keyCode === 27) {
+					e.stopImmediatePropagation();
 					if (!e.repeat) window.parent.postMessage({ type: 'closeDemoViewer' }, '*');
+					e.preventDefault();
 				} else if (e.key === ' ' || e.keyCode === 32) {
+					e.stopImmediatePropagation();
 					if (!e.repeat) window.parent.postMessage({ type: 'togglePause' }, '*');
+					e.preventDefault();
 				} else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+					e.stopImmediatePropagation();
 					window.parent.postMessage({ type: 'skip', direction: -1 }, '*');
+					e.preventDefault();
 				} else if (e.key === 'ArrowRight' || e.keyCode === 39) {
+					e.stopImmediatePropagation();
 					window.parent.postMessage({ type: 'skip', direction: 1 }, '*');
+					e.preventDefault();
 				} else if (e.key === 'ArrowUp' || e.keyCode === 38) {
+					e.stopImmediatePropagation();
 					window.parent.postMessage({ type: 'changeSpeed', direction: 1 }, '*');
+					e.preventDefault();
 				} else if (e.key === 'ArrowDown' || e.keyCode === 40) {
+					e.stopImmediatePropagation();
 					window.parent.postMessage({ type: 'changeSpeed', direction: -1 }, '*');
+					e.preventDefault();
 				}
-				
-				e.preventDefault();
 			}, true);
 
-			window.addEventListener('keyup', e => { e.stopImmediatePropagation(); e.preventDefault(); }, true);
-			window.addEventListener('keypress', e => { e.stopImmediatePropagation(); e.preventDefault(); }, true);
+			window.addEventListener('keyup', e => { 
+				const handledKeys = ['Escape', ' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+				if (handledKeys.includes(e.key) || [27, 32, 37, 38, 39, 40].includes(e.keyCode)) {
+					e.stopImmediatePropagation(); 
+					e.preventDefault(); 
+				}
+			}, true);
+			window.addEventListener('keypress', e => { 
+				const handledKeys = ['Escape', ' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+				if (handledKeys.includes(e.key) || [27, 32, 37, 38, 39, 40].includes(e.keyCode)) {
+					e.stopImmediatePropagation(); 
+					e.preventDefault(); 
+				}
+			}, true);
 
 			const inputOverlay = document.getElementById('input-overlay');
 			
@@ -81,6 +101,7 @@
 			}
 
 			inputOverlay.addEventListener('mousedown', () => {
+				window.focus();
 				window.parent.postMessage({ type: 'canvasClick' }, '*');
 			});
 
@@ -221,7 +242,7 @@
 					output.scrollTop = output.scrollHeight;
 				},
 				canvas: document.getElementById('canvas'),
-				keyboardListeningElement: null // Explicitly tell Emscripten not to listen for keyboard events
+				keyboardListeningElement: window
 			};
 			window.onerror = function(text) {
 				appendOutput(text, true, "red");
