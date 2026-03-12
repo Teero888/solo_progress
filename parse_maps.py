@@ -103,10 +103,10 @@ def parse_maps():
 def parse_demos():
     # MapName -> PlayerName -> BestTime
     progress = {}
-    if not os.path.exists('demos'):
+    if not os.path.exists('public/demos'):
         return progress
 
-    for filename in os.listdir('demos'):
+    for filename in os.listdir('public/demos'):
         if filename.endswith('.demo'):
             # Format: MapName_TimeInSeconds_PlayerName.demo
             # Use regex to find the time (float) which separates map name and player name
