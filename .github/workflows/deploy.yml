@@ -33,8 +33,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      - name: Get KoGmaps Submodule Hash
+        id: submodule-hash
+        run: echo "hash=$(git submodule status public/maps | awk '{print $1}')" >> $GITHUB_OUTPUT
+      - name: Cache KoGmaps Submodule
+        id: cache-submodule
+        uses: actions/cache@v4
+        with:
+          path: public/maps
+          key: ${{ runner.os }}-kogmaps-${{ steps.submodule-hash.outputs.hash }}
+      - name: Update KoGmaps Submodule
+        if: steps.cache-submodule.outputs.cache-hit != 'true'
+        run: git submodule update --init --depth 1 public/maps
+      - name: Update other submodules
+        run: git submodule update --init --recursive --depth 1 --exclude public/maps
       - name: Install dependencies & run script
-        run: npm ci && git submodule update --init public/maps && python parse_maps.py
+        run: npm ci && python parse_maps.py
       - name: Build
         run: npm run build
       - name: Setup Pages
