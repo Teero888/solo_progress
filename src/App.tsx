@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import mapsData from './data/maps.json'
-import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, PlayCircle, Play, Pause } from 'lucide-react'
+import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, Minimize2, PlayCircle, Play, Pause } from 'lucide-react'
 import './App.css'
 
 interface MapEntry {
@@ -37,11 +37,29 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
   const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [skipInterval, setSkipInterval] = useState(5);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   const scrubberRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!isFullscreen) {
+      containerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   // Use a ref to access the latest state in the event listener without re-attaching it
   const stateRef = useRef(demoState);
@@ -313,8 +331,12 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
                   </>
                 )}
                 
-                <button className="maximize-btn" onClick={() => containerRef.current?.requestFullscreen()} title="Full Screen">
-                  <Maximize2 size={18} />
+                <button 
+                  className="maximize-btn" 
+                  onClick={toggleFullscreen} 
+                  title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
+                >
+                  {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
               </div>
             </div>
