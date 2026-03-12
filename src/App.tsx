@@ -507,8 +507,8 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   }, [isDragging, handleScrubberAction, resetControlsTimer]);
 
   const handleOverlayMouseDown = (e: React.MouseEvent) => {
-    // We only care if the click started directly on the overlay
-    if (e.target === e.currentTarget) {
+    // We only care if the click started directly on the overlay with left click
+    if (e.target === e.currentTarget && e.button === 0) {
       startedOnOverlayRef.current = true;
     } else {
       startedOnOverlayRef.current = false;
@@ -520,8 +520,8 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   };
 
   const handleOverlayMouseUp = (e: React.MouseEvent) => {
-    // Only close if it both started and ended on the overlay
-    if (e.target === e.currentTarget && startedOnOverlayRef.current) {
+    // Only close if it both started and ended on the overlay with a left click
+    if (e.target === e.currentTarget && startedOnOverlayRef.current && e.button === 0) {
       handleClose();
     }
     startedOnOverlayRef.current = false;
