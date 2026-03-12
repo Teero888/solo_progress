@@ -162,6 +162,40 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   const [showControls, setShowControls] = useState(true);
   const [skipInterval, setSkipInterval] = useState(5);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [playIndicator, setPlayIndicator] = useState<'play' | 'pause' | null>(null);
+  const [indicatorKey, setIndicatorKey] = useState(0);
+  const indicatorTimeoutRef = useRef<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copyKey, setCopyKey] = useState(0);
+  const shareTimeoutRef = useRef<number | null>(null);
+
+  const triggerIndicator = (type: 'play' | 'pause') => {
+    setPlayIndicator(type);
+    setIndicatorKey(prev => prev + 1);
+    if (indicatorTimeoutRef.current) window.clearTimeout(indicatorTimeoutRef.current);
+    indicatorTimeoutRef.current = window.setTimeout(() => {
+      setPlayIndicator(null);
+    }, 500);
+  };
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!pendingDemo) return;
+    
+    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+    const shareUrl = `${window.location.origin}${baseUrl}/?demo=${encodeURIComponent(pendingDemo.name)}`;
+    navigator.clipboard.writeText(shareUrl);
+    
+    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
+    
+    setCopied(true);
+    setCopyKey(prev => prev + 1);
+    
+    shareTimeoutRef.current = window.setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+
   const controlsTimeoutRef = useRef<number | null>(null);
   const scrubberRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -242,12 +276,20 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       } else if (event.data?.type === 'demoState') {
         setDemoState(event.data.state);
       } else if (event.data?.type === 'canvasClick') {
-        setShowControls(false);
+        // Toggle play/pause and show controls on click inside the canvas
+        if (stateRef.current) {
+          const newPaused = !stateRef.current.isPaused;
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+          triggerIndicator(newPaused ? 'pause' : 'play');
+        }
+        resetControlsTimer();
       } else if (event.data?.type === 'canvasMove') {
         resetControlsTimer();
       } else if (event.data?.type === 'togglePause') {
         if (stateRef.current) {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !stateRef.current.isPaused }, '*');
+          const newPaused = !stateRef.current.isPaused;
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+          triggerIndicator(newPaused ? 'pause' : 'play');
         }
       } else if (event.data?.type === 'skip') {
         if (stateRef.current) {
@@ -273,7 +315,9 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       } else if (e.key === ' ' || e.keyCode === 32) {
         e.preventDefault();
         if (stateRef.current && !e.repeat) {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !stateRef.current.isPaused }, '*');
+          const newPaused = !stateRef.current.isPaused;
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+          triggerIndicator(newPaused ? 'pause' : 'play');
         }
       } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
         e.preventDefault();
@@ -335,6 +379,20 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
 
   const toggleControls = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
+    
+    // Toggle play/pause on click inside the viewer body
+    if (demoState) {
+      const newPaused = !demoState.isPaused;
+      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+      triggerIndicator(newPaused ? 'pause' : 'play');
+    } else if (pendingDemo) {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: 'playDemo',
+        demoUrl: pendingDemo.url,
+        demoName: pendingDemo.name
+      }, '*');
+    }
+
     if (!showControls) {
       resetControlsTimer();
     } else {
@@ -379,6 +437,8 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
     }
     setDemoState(null);
+    setCopied(false);
+    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
     onClose();
     // Increment key to force iframe to re-mount and clean up WASM state
     setViewerKey(prev => prev + 1);
@@ -410,7 +470,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       onMouseDown={handleOverlayMouseDown}
       onMouseUp={handleOverlayMouseUp}
     >
-      <div className="modal-content demo-viewer-content" ref={containerRef}>
+      <div className={`modal-content demo-viewer-content ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
         <div className="modal-header demo-viewer-header">
           <div className="header-info">
             <PlayCircle size={18} className="text-blue" />
@@ -418,6 +478,14 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
             <span className="demo-filename">{pendingDemo ? pendingDemo.name : ''}</span>
           </div>
           <div className="modal-actions">
+            {copied && <span key={copyKey} className="copied-message">Copied!</span>}
+            <button 
+              className="share-button" 
+              onClick={handleShare}
+              title="Share Demo"
+            >
+              Share
+            </button>
             <button className="close-button" onClick={handleClose}><X size={24} /></button>
           </div>
         </div>
@@ -430,6 +498,12 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
             allow="fullscreen; autoplay"
             style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
           />
+
+          {playIndicator && (
+            <div key={indicatorKey} className="play-pause-indicator animate">
+              {playIndicator === 'play' ? <Play size={40} fill="white" /> : <Pause size={40} fill="white" />}
+            </div>
+          )}
           
           <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }} onClick={e => e.stopPropagation()}>
             {demoState && (
