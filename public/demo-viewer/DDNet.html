@@ -106,6 +106,7 @@
 			});
 
 			inputOverlay.addEventListener('touchstart', (e) => {
+				window.focus();
 				window.parent.postMessage({ type: 'canvasClick' }, '*');
 			}, { passive: true });
 
@@ -119,6 +120,7 @@
 
 			async function doPlayDemo(demoUrl, demoName) {
 				try {
+					window.focus();
 					const response = await fetch(demoUrl);
 					if (!response.ok) throw new Error('Failed to fetch demo');
 					const buffer = await response.arrayBuffer();
