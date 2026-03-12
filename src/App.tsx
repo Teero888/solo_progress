@@ -163,11 +163,15 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
   const [skipInterval, setSkipInterval] = useState(5);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [playIndicator, setPlayIndicator] = useState<'play' | 'pause' | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
+  const [demoLoaded, setDemoLoaded] = useState(false);
   const [indicatorKey, setIndicatorKey] = useState(0);
   const indicatorTimeoutRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyKey, setCopyKey] = useState(0);
   const shareTimeoutRef = useRef<number | null>(null);
+  const [viewerKey, setViewerKey] = useState(0);
+  const startedOnOverlayRef = useRef(false);
 
   const triggerIndicator = (type: 'play' | 'pause') => {
     setPlayIndicator(type);
@@ -247,40 +251,106 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
 
   useEffect(() => {
     if (show && pendingDemo && iframeRef.current) {
-      try { (iframeRef.current.contentWindow as any)?.resumeAudio?.(); } catch (e) { }
-
+      setHasStarted(false);
+      setDemoLoaded(false);
+      iframeRef.current.focus();
       const timer = setTimeout(() => {
-        try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch (e) { }
         iframeRef.current?.contentWindow?.postMessage({
           type: 'playDemo',
           demoUrl: pendingDemo.url,
           demoName: pendingDemo.name
         }, '*');
+        
+        // Start paused
+        setTimeout(() => {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: 1 }, '*');
+        }, 100);
       }, 500);
       resetControlsTimer();
       return () => clearTimeout(timer);
     }
-  }, [show, pendingDemo, resetControlsTimer]);
+  }, [show, pendingDemo, resetControlsTimer, iframeRef]);
 
-  // Use useCallback so we don't recreate the listener on every render
-  const memoizedOnClose = useCallback(onClose, [onClose]);
+  // Keep focus on the iframe at all times when shown
+  useEffect(() => {
+    if (!show || !iframeRef.current) return;
+
+    const focusIframe = () => {
+      if (iframeRef.current && document.activeElement !== iframeRef.current) {
+        iframeRef.current.focus();
+      }
+    };
+
+    const handleUserInteraction = () => {
+      if (iframeRef.current) {
+        iframeRef.current.focus();
+        // Always ping resumeAudio on interaction to unlock audio context in the iframe
+        iframeRef.current.contentWindow?.postMessage({ type: 'resumeAudio' }, '*');
+      }
+    };
+
+    // Focus immediately and frequently
+    focusIframe();
+    const intervalId = setInterval(focusIframe, 50);
+
+    // Also focus whenever anything happens that might steal focus
+    window.addEventListener('focus', focusIframe);
+    document.addEventListener('mousedown', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', focusIframe);
+      document.removeEventListener('mousedown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+    };
+  }, [show, iframeRef]);
+
+  const handleClose = useCallback(() => {
+    if (iframeRef.current) {
+      iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
+    }
+    setDemoState(null);
+    setHasStarted(false);
+    setDemoLoaded(false);
+    setCopied(false);
+    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
+    onClose();
+    // Increment key to force iframe to re-mount and clean up WASM state
+    setViewerKey(prev => prev + 1);
+  }, [onClose, iframeRef]);
+
+  const handleInitialPlay = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    if (iframeRef.current) {
+      iframeRef.current.focus();
+      iframeRef.current.contentWindow?.postMessage({ type: 'pauseDemo', pause: 0 }, '*');
+      triggerIndicator('play');
+      setHasStarted(true);
+      resetControlsTimer();
+    }
+  };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'closeDemoViewer') {
-        if (iframeRef.current) {
-          iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
-        }
-        setDemoState(null);
-        memoizedOnClose();
+        handleClose();
+      } else if (event.data?.type === 'demoLoaded') {
+        setDemoLoaded(true);
       } else if (event.data?.type === 'demoState') {
         setDemoState(event.data.state);
       } else if (event.data?.type === 'canvasClick') {
         // Toggle play/pause and show controls on click inside the canvas
+        if (iframeRef.current) {
+          iframeRef.current.focus();
+        }
         if (stateRef.current) {
           const newPaused = !stateRef.current.isPaused;
           iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
           triggerIndicator(newPaused ? 'pause' : 'play');
+          if (!newPaused) setHasStarted(true);
         }
         resetControlsTimer();
       } else if (event.data?.type === 'canvasMove') {
@@ -290,6 +360,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
           const newPaused = !stateRef.current.isPaused;
           iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
           triggerIndicator(newPaused ? 'pause' : 'play');
+          if (!newPaused) setHasStarted(true);
         }
       } else if (event.data?.type === 'skip') {
         if (stateRef.current) {
@@ -318,6 +389,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
           const newPaused = !stateRef.current.isPaused;
           iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
           triggerIndicator(newPaused ? 'pause' : 'play');
+          if (!newPaused) setHasStarted(true);
         }
       } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
         e.preventDefault();
@@ -354,7 +426,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       window.removeEventListener('message', handleMessage);
       window.removeEventListener('keydown', handleKeyDown);
     }
-  }, [memoizedOnClose, show, resetControlsTimer]);
+  }, [show, resetControlsTimer, handleClose, iframeRef]);
 
   const handleScrubberAction = useCallback((clientX: number) => {
     if (!scrubberRef.current || !stateRef.current) return;
@@ -364,7 +436,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
     const totalTicks = stateRef.current.lastTick - stateRef.current.firstTick;
     const targetTick = stateRef.current.firstTick + Math.round(percentage * totalTicks);
     iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: targetTick }, '*');
-  }, []);
+  }, [iframeRef]);
 
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -385,12 +457,14 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
       const newPaused = !demoState.isPaused;
       iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
       triggerIndicator(newPaused ? 'pause' : 'play');
+      if (!newPaused) setHasStarted(true);
     } else if (pendingDemo) {
       iframeRef.current?.contentWindow?.postMessage({
         type: 'playDemo',
         demoUrl: pendingDemo.url,
         demoName: pendingDemo.name
       }, '*');
+      setHasStarted(true);
     }
 
     if (!showControls) {
@@ -398,6 +472,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
     } else {
       setShowControls(false);
       if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+    }
+    // Also refocus iframe on any click in the viewer area
+    if (iframeRef.current) {
+      iframeRef.current.focus();
     }
   };
 
@@ -428,40 +506,34 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
     };
   }, [isDragging, handleScrubberAction, resetControlsTimer]);
 
-  if (!hasLoaded) return null;
-
-  const [viewerKey, setViewerKey] = useState(0);
-
-  const handleClose = () => {
-    if (iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
-    }
-    setDemoState(null);
-    setCopied(false);
-    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
-    onClose();
-    // Increment key to force iframe to re-mount and clean up WASM state
-    setViewerKey(prev => prev + 1);
-  };
-
   const handleOverlayMouseDown = (e: React.MouseEvent) => {
     // We only care if the click started directly on the overlay
     if (e.target === e.currentTarget) {
-      (e.currentTarget as any)._startedOnOverlay = true;
+      startedOnOverlayRef.current = true;
     } else {
-      (e.currentTarget as any)._startedOnOverlay = false;
+      startedOnOverlayRef.current = false;
+    }
+    // Also refocus iframe on any click in the overlay area
+    if (iframeRef.current) {
+      iframeRef.current.focus();
     }
   };
 
   const handleOverlayMouseUp = (e: React.MouseEvent) => {
     // Only close if it both started and ended on the overlay
-    if (e.target === e.currentTarget && (e.currentTarget as any)._startedOnOverlay) {
+    if (e.target === e.currentTarget && startedOnOverlayRef.current) {
       handleClose();
     }
-    (e.currentTarget as any)._startedOnOverlay = false;
+    startedOnOverlayRef.current = false;
+    // Also refocus iframe on any click in the overlay area
+    if (iframeRef.current) {
+      iframeRef.current.focus();
+    }
   };
 
   const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
+
+  if (!hasLoaded) return null;
 
   return (
     <div
@@ -493,11 +565,21 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
           <iframe
             key={viewerKey}
             ref={iframeRef}
+            onLoad={() => iframeRef.current?.focus()}
             src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`}
             title="DDNet Demo Viewer"
             allow="fullscreen; autoplay"
+            tabIndex={0}
             style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
           />
+
+          {!hasStarted && demoLoaded && (
+            <div className="initial-play-overlay" onClick={handleInitialPlay}>
+              <button className="initial-play-button" title="Play Demo">
+                <Play size={48} fill="white" />
+              </button>
+            </div>
+          )}
 
           {playIndicator && (
             <div key={indicatorKey} className="play-pause-indicator animate">
@@ -527,13 +609,16 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
                   className="demo-play-pause"
                   onClick={() => {
                     if (demoState) {
-                      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !demoState.isPaused }, '*');
+                      const newPaused = !demoState.isPaused;
+                      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+                      if (!newPaused) setHasStarted(true);
                     } else if (pendingDemo) {
                       iframeRef.current?.contentWindow?.postMessage({
                         type: 'playDemo',
                         demoUrl: pendingDemo.url,
                         demoName: pendingDemo.name
                       }, '*');
+                      setHasStarted(true);
                     }
                   }}
                 >
@@ -775,9 +860,6 @@ function App() {
     e.stopPropagation();
     const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
     const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
-
-    // Resume audio immediately within the user gesture
-    try { (iframeRef.current?.contentWindow as any)?.resumeAudio?.(); } catch (err) { }
 
     setPendingDemo({ url: demoUrl, name: demoName });
     setShowDemoViewer(true);
