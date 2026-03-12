@@ -1,5 +1,5 @@
 /*! coi-serviceworker v0.1.7-mod | MIT License | https://github.com/gzuidhof/coi-serviceworker */
-const VERSION = "1.0.3";
+const VERSION = "1.0.4";
 
 if (typeof window === 'undefined') {
     const CACHE_NAME = `ddnet-assets-v${VERSION}`;
@@ -17,48 +17,64 @@ if (typeof window === 'undefined') {
     });
 
     async function handleRequest(event) {
-        const url = new URL(event.request.url);
-        
-        if (event.request.method !== 'GET' || !url.protocol.startsWith('http')) {
-            return fetch(event.request);
+        const request = event.request;
+        const url = new URL(request.url);
+
+        if (request.method !== 'GET' || !url.protocol.startsWith('http')) {
+            return fetch(request);
+        }
+
+        if (request.cache === "only-if-cached" && request.mode !== "same-origin") {
+            return;
         }
 
         const shouldCache = CACHE_MATCH.some(regex => regex.test(url.pathname));
 
         try {
             if (shouldCache) {
-                const cachedResponse = await caches.match(event.request);
+                const cachedResponse = await caches.match(request);
                 if (cachedResponse) return cachedResponse;
             }
 
-            const response = await fetch(event.request);
-
-            if (response.status === 0 || response.status === 304 || response.status === 204 || response.redirected) {
-                return response;
+            let fetchResponse;
+            try {
+                fetchResponse = await fetch(request);
+            } catch (e) {
+                if (request.mode === 'navigate' || request.mode === 'no-cors') {
+                    console.warn(`[COI SW v${VERSION}] Retrying fetch with fresh request for:`, url.pathname);
+                    fetchResponse = await fetch(request.url);
+                } else {
+                    throw e;
+                }
             }
 
-            const newHeaders = new Headers(response.headers);
+            if (fetchResponse.status === 0 || fetchResponse.status === 304 || fetchResponse.status === 204 || fetchResponse.redirected) {
+                return fetchResponse;
+            }
+
+            const newHeaders = new Headers(fetchResponse.headers);
             newHeaders.set("Cross-Origin-Embedder-Policy", "require-corp");
             newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
             newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
 
-            const moddedResponse = new Response(response.body, {
-                status: response.status,
-                statusText: response.statusText,
+            const moddedResponse = new Response(fetchResponse.body, {
+                status: fetchResponse.status,
+                statusText: fetchResponse.statusText,
                 headers: newHeaders,
             });
 
-            if (shouldCache && response.status === 200) {
+            if (shouldCache && fetchResponse.status === 200) {
                 const clone = moddedResponse.clone();
                 caches.open(CACHE_NAME).then(cache => {
-                    cache.put(event.request, clone).catch(() => {});
-                }).catch(() => {});
+                    cache.put(request, clone).catch(() => { });
+                }).catch(() => { });
             }
 
             return moddedResponse;
         } catch (err) {
-            console.error(`[COI SW v${VERSION}] Error:`, url.pathname, err);
-            return fetch(event.request);
+            console.error(`[COI SW v${VERSION}] Fatal Error:`, url.pathname, err);
+            // Last resort: standard fetch with no modifications
+            return fetch(request);
         }
     }
 
@@ -73,12 +89,15 @@ if (typeof window === 'undefined') {
                 if (registration.active && !window.crossOriginIsolated) {
                     const reloaded = sessionStorage.getItem("coiReloaded");
                     if (!reloaded) {
+                        console.log(`[COI SW v${VERSION}] Forcing reload for Cross-Origin Isolation...`);
                         sessionStorage.setItem("coiReloaded", "true");
                         window.location.reload();
                     }
                 } else if (window.crossOriginIsolated) {
                     sessionStorage.removeItem("coiReloaded");
                 }
+            }).catch(err => {
+                console.error(`[COI SW v${VERSION}] Registration failed:`, err);
             });
         }
     })();
