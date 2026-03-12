@@ -199,9 +199,17 @@
 				window.parent.postMessage({ type: 'canvasClick' }, '*');
 			});
 
+			Module['canvas'].addEventListener('touchstart', () => {
+				window.parent.postMessage({ type: 'canvasClick' }, '*');
+			}, { passive: true });
+
 			Module['canvas'].addEventListener('mousemove', () => {
 				window.parent.postMessage({ type: 'canvasMove' }, '*');
 			});
+
+			Module['canvas'].addEventListener('touchmove', () => {
+				window.parent.postMessage({ type: 'canvasMove' }, '*');
+			}, { passive: true });
 
 			Module['canvas'].addEventListener('contextmenu', e => e.preventDefault());
 			Module['canvas'].addEventListener('webglcontextcreationerror', e => {

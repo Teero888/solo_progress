@@ -183,10 +183,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
     }
   }, [memoizedOnClose, show, resetControlsTimer]);
 
-  const handleScrubberAction = useCallback((e: React.MouseEvent | MouseEvent) => {
+  const handleScrubberAction = useCallback((clientX: number) => {
     if (!scrubberRef.current || !stateRef.current) return;
     const rect = scrubberRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const x = clientX - rect.left;
     const percentage = Math.max(0, Math.min(1, x / rect.width));
     const totalTicks = stateRef.current.lastTick - stateRef.current.firstTick;
     const targetTick = stateRef.current.firstTick + Math.round(percentage * totalTicks);
@@ -195,24 +195,51 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
 
   const onMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
-    handleScrubberAction(e);
+    handleScrubberAction(e.clientX);
+  };
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setIsDragging(true);
+    handleScrubberAction(e.touches[0].clientX);
+    resetControlsTimer();
+  };
+
+  const toggleControls = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    if (!showControls) {
+      resetControlsTimer();
+    } else {
+      setShowControls(false);
+      if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+    }
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) handleScrubberAction(e);
+      if (isDragging) handleScrubberAction(e.clientX);
+    };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isDragging) {
+        handleScrubberAction(e.touches[0].clientX);
+        resetControlsTimer();
+      }
     };
     const handleMouseUp = () => setIsDragging(false);
+    const handleTouchEnd = () => setIsDragging(false);
 
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
     }
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isDragging, handleScrubberAction]);
+  }, [isDragging, handleScrubberAction, resetControlsTimer]);
 
   if (!hasLoaded) return null;
 
@@ -239,7 +266,7 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
             <button className="close-button" onClick={handleClose}><X size={24} /></button>
           </div>
         </div>
-        <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer}>
+        <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer} onClick={toggleControls}>
           <iframe 
             ref={iframeRef}
             src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
@@ -248,12 +275,13 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
             style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
           />
           
-          <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }}>
+          <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }} onClick={e => e.stopPropagation()}>
             {demoState && (
               <div 
                 className="demo-scrubber-wrapper" 
                 ref={scrubberRef}
                 onMouseDown={onMouseDown}
+                onTouchStart={onTouchStart}
                 style={{ height: '30px', display: 'flex', alignItems: 'center' }}
               >
                 <div className="demo-scrubber-track" style={{ width: '100%' }}>
