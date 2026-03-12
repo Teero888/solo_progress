@@ -247,26 +247,33 @@ select:hover {
   opacity: 1;
 }
 
-.hover-preview-fixed {
+.map-row-preview {
   position: fixed;
-  left: calc(50% - 700px - 540px); /* Smaller size + bigger gap */
-  top: 0;
+  left: 10px; /* Default for smaller screens */
+  transform: translateY(-50%);
   z-index: 100;
-  pointer-events: auto;
-  cursor: pointer;
-  will-change: transform;
-  transition: transform 0.1s cubic-bezier(0.2, 0, 0.4, 1);
-  max-width: 90vw;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
 }
 
-@media (max-width: 2500px) {
-  .hover-preview-fixed {
-    left: 10px;
+.map-row-preview.visible {
+  opacity: 1;
+}
+
+/* Ensure the inner preview doesn't have its own mount animation when used in row */
+.map-row-preview .hover-preview {
+  animation: none;
+}
+
+@media (min-width: 2501px) {
+  .map-row-preview {
+    left: calc(50% - 700px - 540px); /* Position it on the far left for ultra-wide */
   }
 }
 
 @media (max-width: 1200px) {
-  .hover-preview-fixed {
+  .map-row-preview {
     display: none;
   }
 }
@@ -283,11 +290,11 @@ select:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: fadeIn 0.15s ease-out;
+  animation: fadeIn 0.1s ease-out;
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.98); }
+  from { opacity: 0; transform: scale(0.99); }
   to { opacity: 1; transform: scale(1); }
 }
 
@@ -295,6 +302,11 @@ select:hover {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.hover-preview img.loading {
+  opacity: 0.5;
 }
 
 .modal-overlay {

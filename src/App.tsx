@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import mapsData from './data/maps.json'
 import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, Minimize2, PlayCircle, Play, Pause } from 'lucide-react'
 import './App.css'
@@ -33,7 +33,131 @@ const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
 const SKIP_OPTIONS = [0.5, 1, 2, 5, 10];
 
-function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void, iframeRef: React.RefObject<HTMLIFrameElement> }) {
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = (seconds % 60).toFixed(3);
+  return `${mins}:${secs.padStart(6, '0')}`;
+};
+
+let globalZIndex = 1000;
+
+const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDemo }: {
+  map: MapEntry,
+  mapProgress: Record<string, number>,
+  currentPlayer: string,
+  onSelect: (map: { name: string, difficulty: string }) => void,
+  onPlayDemo: (e: React.MouseEvent, mapName: string, player: string, time: number) => void
+}) => {
+  const [isMounted, setIsMounted] = useState(false);
+  const [isShowing, setIsShowing] = useState(false);
+  const [hoverY, setHoverY] = useState(0);
+  const [zIndex, setZIndex] = useState(1000);
+  const leaveTimeoutRef = useRef<number | null>(null);
+
+  const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
+  const isFinished = Object.keys(mapProgress).length > 0;
+  
+  // Sort leaderboard
+  const leaderboard = useMemo(() => Object.entries(mapProgress)
+    .sort(([, a], [, b]) => a - b), [mapProgress]);
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverY(rect.top + rect.height / 2);
+    
+    globalZIndex++;
+    setZIndex(globalZIndex);
+    
+    setIsMounted(true);
+    // Use requestAnimationFrame or setTimeout(0) to ensure the mount is processed before triggering the show animation
+    requestAnimationFrame(() => {
+      setIsShowing(true);
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setIsShowing(false);
+    leaveTimeoutRef.current = window.setTimeout(() => {
+      setIsMounted(false);
+    }, 300); // Must match CSS transition duration
+  };
+
+  useEffect(() => {
+    return () => {
+      if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
+    };
+  }, []);
+
+  return (
+    <tr 
+      className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
+    >
+      <td 
+        className="font-bold map-cell"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={() => onSelect({ name: map.name, difficulty: map.difficulty })}
+      >
+        <div className="map-name-wrapper">
+          {map.name}
+          <Maximize2 size={12} className="preview-icon" />
+        </div>
+        {isMounted && (
+          <div 
+            className={`map-row-preview ${isShowing ? 'visible' : ''}`} 
+            style={{ top: hoverY, zIndex }}
+          >
+            <MapPreview mapName={map.name} difficulty={map.difficulty} />
+          </div>
+        )}
+      </td>
+      <td>
+        <span className={`badge badge-${map.difficulty.toLowerCase()}`}>
+          {map.difficulty}
+        </span>
+      </td>
+      <td className="stars">{map.stars}</td>
+      <td className="font-mono">{map.points}</td>
+      <td className="font-mono text-center">{map.length}</td>
+      <td className="text-dim">{map.creator}</td>
+      <td>
+        {isFinished ? (
+          <div className="leaderboard">
+            {currentPlayer !== 'All Players' && playerTime ? (
+              <div className="status-finished">
+                <CheckCircle2 className="icon-success" size={16} />
+                <span className="time-display highlight">{formatTime(playerTime)}</span>
+              </div>
+            ) : null}
+            
+            <div className="top-finishers">
+              {leaderboard.slice(0, 3).map(([player, time], idx) => (
+                <div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
+                  {idx === 0 && <Trophy size={10} className="icon-gold" />}
+                  <span className="finisher-name">{player}</span>
+                  <span className="finisher-time">{formatTime(time)}</span>
+                  <button 
+                    className="play-demo-btn" 
+                    onClick={(e) => onPlayDemo(e, map.name, player, time)}
+                    title="Play Demo"
+                  >
+                    <PlayCircle size={12} />
+                  </button>
+                </div>
+              ))}
+              {leaderboard.length > 3 && <span className="more-count">+{leaderboard.length - 3} more</span>}
+            </div>
+          </div>
+        ) : (
+          <Circle className="text-dim" size={18} />
+        )}
+      </td>
+    </tr>
+  );
+});
+
+function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void, iframeRef: React.RefObject<HTMLIFrameElement | null> }) {
   const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [skipInterval, setSkipInterval] = useState(5);
@@ -410,16 +534,52 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show
 function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName: string, difficulty: string, isFull?: boolean, onClose?: () => void }) {
   const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
   const [hasError, setHasError] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [copyKey, setCopyKey] = useState(0);
   const timeoutRef = useRef<number | null>(null);
 
-  // Reset error state when map changes
+  // Preload and manage thumbnail
   useEffect(() => {
+    if (isFull) return;
+    
+    setIsLoading(true);
     setHasError(false);
+    
+    const url = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      setImgSrc(url);
+      setIsLoading(false);
+      setHasError(false);
+    };
+    img.onerror = () => {
+      setHasError(true);
+      setIsLoading(false);
+    };
+  }, [mapName, baseUrl, isFull]);
+
+  // Reset copied state when map changes
+  useEffect(() => {
     setCopied(false);
     if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
   }, [mapName]);
+
+  // Handle Escape key for full preview
+  useEffect(() => {
+    if (!isFull || !onClose) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFull, onClose]);
 
   if (isFull) {
     const diffParam = difficulty.toUpperCase();
@@ -464,16 +624,15 @@ function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName:
     );
   }
 
-  const imageUrl = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
   return (
     <div className="hover-preview">
       {hasError ? (
         <span className="hover-preview-loading">No preview available</span>
       ) : (
         <img 
-          src={imageUrl} 
+          src={imgSrc || `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`} 
           alt={`Map preview: ${mapName}`}
-          onError={() => setHasError(true)}
+          className={isLoading ? 'loading' : ''}
         />
       )}
     </div>
@@ -520,7 +679,7 @@ function App() {
     const params = new URLSearchParams(window.location.search);
     return !!params.get('demo');
   });
-  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(true);
+  const hasLoadedDemoViewer = true;
   const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const demoName = params.get('demo');
@@ -538,7 +697,7 @@ function App() {
     setPendingDemo(null);
   }, []);
 
-  const handlePlayDemo = (e: React.MouseEvent, mapName: string, player: string, time: number) => {
+  const handlePlayDemo = useCallback((e: React.MouseEvent, mapName: string, player: string, time: number) => {
     e.stopPropagation();
     const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
     const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
@@ -548,10 +707,8 @@ function App() {
 
     setPendingDemo({ url: demoUrl, name: demoName });
     setShowDemoViewer(true);
-  };
+  }, []);
 
-  const [hoveredMap, setHoveredMap] = useState<{name: string, difficulty: string} | null>(null);
-  const [hoverY, setHoverY] = useState<number>(0);
   const [selectedMap, setSelectedMap] = useState<{name: string, difficulty: string} | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const mapName = params.get('preview');
@@ -561,7 +718,6 @@ function App() {
     }
     return null;
   });
-  const hoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -582,12 +738,6 @@ function App() {
 
   const difficulties = DIFFICULTIES;
   const allPlayers = ALL_PLAYERS;
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = (seconds % 60).toFixed(3);
-    return `${mins}:${secs.padStart(6, '0')}`;
-  }
 
   const getMapTime = (mapName: string) => {
     const mapProgress = data.progress[mapName] || {};
@@ -655,26 +805,6 @@ function App() {
     }
   }
 
-  const handleMouseEnter = (e: React.MouseEvent, name: string, difficulty: string) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = rect.top + rect.height / 2;
-
-    if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
-
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      setHoverY(y);
-      setHoveredMap({ name, difficulty });
-    }, 50);
-  };
-
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
-
-    // Delay unmounting slightly so user can move mouse to the preview itself
-    hoverTimeoutRef.current = window.setTimeout(() => {
-      setHoveredMap(null);
-    }, 100);
-  };
   const stats = useMemo(() => {
     let finished = 0;
     let points = 0;
@@ -794,72 +924,16 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {filteredMaps.map(map => {
-              const mapProgress = data.progress[map.name] || {};
-              const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
-              const isFinished = Object.keys(mapProgress).length > 0;
-              
-              // Sort leaderboard
-              const leaderboard = Object.entries(mapProgress)
-                .sort(([, a], [, b]) => a - b);
-
-              return (
-                <tr key={map.name} className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}>
-                  <td 
-                    className="font-bold map-cell"
-                    onMouseEnter={(e) => handleMouseEnter(e, map.name, map.difficulty)}
-                    onMouseLeave={handleMouseLeave}
-                    onClick={() => setSelectedMap({ name: map.name, difficulty: map.difficulty })}
-                  >
-                    <div className="map-name-wrapper">
-                      {map.name}
-                      <Maximize2 size={12} className="preview-icon" />
-                    </div>
-                  </td>
-                  <td>
-                    <span className={`badge badge-${map.difficulty.toLowerCase()}`}>
-                      {map.difficulty}
-                    </span>
-                  </td>
-                  <td className="stars">{map.stars}</td>
-                  <td className="font-mono">{map.points}</td>
-                  <td className="font-mono text-center">{map.length}</td>
-                  <td className="text-dim">{map.creator}</td>
-                  <td>
-                    {isFinished ? (
-                      <div className="leaderboard">
-                        {currentPlayer !== 'All Players' && playerTime ? (
-                          <div className="status-finished">
-                            <CheckCircle2 className="icon-success" size={16} />
-                            <span className="time-display highlight">{formatTime(playerTime)}</span>
-                          </div>
-                        ) : null}
-                        
-                        <div className="top-finishers">
-                          {leaderboard.slice(0, 3).map(([player, time], idx) => (
-                            <div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
-                              {idx === 0 && <Trophy size={10} className="icon-gold" />}
-                              <span className="finisher-name">{player}</span>
-                              <span className="finisher-time">{formatTime(time)}</span>
-                              <button 
-                                className="play-demo-btn" 
-                                onClick={(e) => handlePlayDemo(e, map.name, player, time)}
-                                title="Play Demo"
-                              >
-                                <PlayCircle size={12} />
-                              </button>
-                            </div>
-                          ))}
-                          {leaderboard.length > 3 && <span className="more-count">+{leaderboard.length - 3} more</span>}
-                        </div>
-                      </div>
-                    ) : (
-                      <Circle className="text-dim" size={18} />
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
+            {filteredMaps.map(map => (
+              <MapRow 
+                key={map.name}
+                map={map}
+                mapProgress={data.progress[map.name] || {}}
+                currentPlayer={currentPlayer}
+                onSelect={setSelectedMap}
+                onPlayDemo={handlePlayDemo}
+              />
+            ))}
           </tbody>
         </table>
       </main>
@@ -870,29 +944,14 @@ function App() {
         </div>
       )}
 
-      {hoveredMap && !selectedMap && (
-        <div 
-          className="hover-preview-fixed" 
-          style={{ transform: `translate3d(0, ${hoverY}px, 0) translateY(-50%)` }}
-          onMouseEnter={() => {
-            if (hoverTimeoutRef.current) window.clearTimeout(hoverTimeoutRef.current);
-          }}
-          onMouseLeave={handleMouseLeave}
-          onClick={() => setSelectedMap(hoveredMap)}
-        >
-          <MapPreview mapName={hoveredMap.name} difficulty={hoveredMap.difficulty} />
-        </div>
-      )}
-
       {selectedMap && (
-        <MapPreview 
-          mapName={selectedMap.name} 
+        <MapPreview
+          mapName={selectedMap.name}
           difficulty={selectedMap.difficulty}
           isFull={true} 
           onClose={() => setSelectedMap(null)} 
         />
       )}
-
       <DemoViewer
         show={showDemoViewer}
         hasLoaded={hasLoadedDemoViewer}
