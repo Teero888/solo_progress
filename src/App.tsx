@@ -31,9 +31,44 @@ const ALL_PLAYERS = ['All Players', ...data.players.sort()];
 const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
+const SKIP_OPTIONS = [0.5, 1, 2, 5, 10];
+
 function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void }) {
   const [demoState, setDemoState] = useState<{isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number} | null>(null);
+  const [showControls, setShowControls] = useState(true);
+  const [skipInterval, setSkipInterval] = useState(5);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const controlsTimeoutRef = useRef<number | null>(null);
+  const scrubberRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Use a ref to access the latest state in the event listener without re-attaching it
+  const stateRef = useRef(demoState);
+  const skipIntervalRef = useRef(skipInterval);
+  
+  useEffect(() => {
+    stateRef.current = demoState;
+  }, [demoState]);
+
+  useEffect(() => {
+    skipIntervalRef.current = skipInterval;
+  }, [skipInterval]);
+
+  const resetControlsTimer = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
+
+  const formatTick = (tick: number) => {
+    const seconds = Math.max(0, Math.floor(tick / 50));
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     if (show && pendingDemo && iframeRef.current) {
@@ -44,9 +79,10 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
           demoName: pendingDemo.name
         }, '*');
       }, 500);
+      resetControlsTimer();
       return () => clearTimeout(timer);
     }
-  }, [show, pendingDemo]);
+  }, [show, pendingDemo, resetControlsTimer]);
 
   // Use useCallback so we don't recreate the listener on every render
   const memoizedOnClose = useCallback(onClose, [onClose]);
@@ -61,11 +97,104 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
         memoizedOnClose();
       } else if (event.data?.type === 'demoState') {
         setDemoState(event.data.state);
+      } else if (event.data?.type === 'canvasClick') {
+        setShowControls(false);
+      } else if (event.data?.type === 'canvasMove') {
+        resetControlsTimer();
+      } else if (event.data?.type === 'togglePause') {
+        if (stateRef.current) {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !stateRef.current.isPaused }, '*');
+        }
+      } else if (event.data?.type === 'skip') {
+        if (stateRef.current) {
+          const skipTicks = skipIntervalRef.current * 50; 
+          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + (event.data.direction * skipTicks)));
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+        }
+      } else if (event.data?.type === 'changeSpeed') {
+        if (stateRef.current) {
+          const newSpeed = event.data.direction > 0 ? 
+            Math.min(10.0, stateRef.current.speed + 0.25) : 
+            Math.max(0.25, stateRef.current.speed - 0.25);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+        }
       }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!show) return;
+      if (e.key === ' ' || e.keyCode === 32) {
+        e.preventDefault();
+        if (stateRef.current) {
+          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !stateRef.current.isPaused }, '*');
+        }
+      } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+        e.preventDefault();
+        if (stateRef.current) {
+          const skipTicks = skipIntervalRef.current * 50;
+          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick - skipTicks));
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+        }
+      } else if (e.key === 'ArrowRight' || e.keyCode === 39) {
+        e.preventDefault();
+        if (stateRef.current) {
+          const skipTicks = skipIntervalRef.current * 50;
+          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + skipTicks));
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+        }
+      } else if (e.key === 'ArrowUp' || e.keyCode === 38) {
+        e.preventDefault();
+        if (stateRef.current) {
+          const newSpeed = Math.min(10.0, stateRef.current.speed + 0.25);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+        }
+      } else if (e.key === 'ArrowDown' || e.keyCode === 40) {
+        e.preventDefault();
+        if (stateRef.current) {
+          const newSpeed = Math.max(0.25, stateRef.current.speed - 0.25);
+          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+        }
+      }
+    };
+
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [memoizedOnClose]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [memoizedOnClose, show, resetControlsTimer]);
+
+  const handleScrubberAction = useCallback((e: React.MouseEvent | MouseEvent) => {
+    if (!scrubberRef.current || !stateRef.current) return;
+    const rect = scrubberRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const totalTicks = stateRef.current.lastTick - stateRef.current.firstTick;
+    const targetTick = stateRef.current.firstTick + Math.round(percentage * totalTicks);
+    iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: targetTick }, '*');
+  }, []);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    setIsDragging(true);
+    handleScrubberAction(e);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) handleScrubberAction(e);
+    };
+    const handleMouseUp = () => setIsDragging(false);
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleScrubberAction]);
 
   if (!hasLoaded) return null;
 
@@ -77,62 +206,119 @@ function DemoViewer({ show, hasLoaded, pendingDemo, onClose }: { show: boolean, 
     onClose();
   };
 
+  const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
+
   return (
     <div className="modal-overlay" style={{ display: show ? 'flex' : 'none' }} onClick={handleClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Demo Viewer {pendingDemo ? `- ${pendingDemo.name}` : ''}</h3>
+      <div className="modal-content demo-viewer-content" ref={containerRef} onClick={e => e.stopPropagation()}>
+        <div className="modal-header demo-viewer-header">
+          <div className="header-info">
+            <PlayCircle size={18} className="text-blue" />
+            <h3>{pendingDemo ? pendingDemo.name.split('_')[0] : 'Demo Viewer'}</h3>
+            <span className="demo-filename">{pendingDemo ? pendingDemo.name : ''}</span>
+          </div>
           <div className="modal-actions">
             <button className="close-button" onClick={handleClose}><X size={24} /></button>
           </div>
         </div>
-        <div className="modal-body">
+        <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer}>
           <iframe 
             ref={iframeRef}
             src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`} 
             title="DDNet Demo Viewer"
             allow="fullscreen"
+            style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
           />
-          {(demoState || pendingDemo) && (
-            <div className="demo-timeline-controls">
-              <button 
-                className="demo-play-pause"
-                onClick={() => {
-                  if (demoState) {
-                    iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !demoState.isPaused }, '*');
-                  } else if (pendingDemo) {
-                    iframeRef.current?.contentWindow?.postMessage({
-                      type: 'playDemo',
-                      demoUrl: pendingDemo.url,
-                      demoName: pendingDemo.name
-                    }, '*');
-                  }
-                }}
-                style={{ paddingLeft: (demoState && demoState.isPaused) || !demoState ? '3px' : '0' }}
+          
+          <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }}>
+            {demoState && (
+              <div 
+                className="demo-scrubber-wrapper" 
+                ref={scrubberRef}
+                onMouseDown={onMouseDown}
+                style={{ height: '30px', display: 'flex', alignItems: 'center' }}
               >
-                {(demoState && !demoState.isPaused) ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
-              </button>
-              {demoState ? (
-                <>
-                  <input 
-                    type="range" 
-                    className="demo-scrubber"
-                    min={demoState.firstTick} 
-                    max={demoState.lastTick} 
-                    value={demoState.currentTick}
-                    onChange={(e) => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: parseInt(e.target.value) }, '*')}
-                  />
-                  <div className="demo-speed-controls">
-                    <button onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.max(0.1, demoState.speed - 0.25) }, '*')}>-</button>
-                    <span>{demoState.speed.toFixed(2)}x</span>
-                    <button onClick={() => iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: demoState.speed + 0.25 }, '*')}>+</button>
+                <div className="demo-scrubber-track" style={{ width: '100%' }}>
+                  <div className="scrubber-progress" style={{ width: `${progressPercent}%` }}></div>
+                  <div className="scrubber-handle" style={{ left: `${progressPercent}%`, display: 'block' }}></div>
+                </div>
+              </div>
+            )}
+            
+            <div className="demo-controls-bar">
+              <div className="controls-left">
+                <button 
+                  className="demo-play-pause"
+                  onClick={() => {
+                    if (demoState) {
+                      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: !demoState.isPaused }, '*');
+                    } else if (pendingDemo) {
+                      iframeRef.current?.contentWindow?.postMessage({
+                        type: 'playDemo',
+                        demoUrl: pendingDemo.url,
+                        demoName: pendingDemo.name
+                      }, '*');
+                    }
+                  }}
+                >
+                  {(demoState && !demoState.isPaused) ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{marginLeft: '2px'}} />}
+                </button>
+                
+                {demoState && (
+                  <div className="demo-time-display">
+                    <span className="current">{formatTick(demoState.currentTick - demoState.firstTick)}</span>
+                    <span className="separator">/</span>
+                    <span className="total">{formatTick(demoState.lastTick - demoState.firstTick)}</span>
                   </div>
-                </>
-              ) : (
-                <div className="demo-loading-text" style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Replay ended or loading...</div>
+                )}
+              </div>
+
+              {!demoState && pendingDemo && (
+                <div className="demo-status-text">Loading replay...</div>
               )}
+
+              <div className="controls-right">
+                {demoState && (
+                  <>
+                    <div className="skip-interval-selector">
+                      <span className="label">Skip:</span>
+                      <select value={skipInterval} onChange={(e) => setSkipInterval(parseFloat(e.target.value))}>
+                        {SKIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}s</option>)}
+                      </select>
+                    </div>
+                    <div className="demo-speed-selector">
+                      <button 
+                        className="speed-btn"
+                        onClick={() => {
+                          const newSpeed = Math.max(0.25, demoState.speed - 0.25);
+                          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+                        }}
+                      >
+                        -
+                      </button>
+                      <div className="speed-value">
+                        <Clock size={14} />
+                        <span>{demoState.speed.toFixed(2)}x</span>
+                      </div>
+                      <button 
+                        className="speed-btn"
+                        onClick={() => {
+                          const newSpeed = Math.min(10.0, demoState.speed + 0.25);
+                          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+                        }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </>
+                )}
+                
+                <button className="maximize-btn" onClick={() => containerRef.current?.requestFullscreen()} title="Full Screen">
+                  <Maximize2 size={18} />
+                </button>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
@@ -248,9 +434,23 @@ function App() {
     return val === 'asc' || val === 'desc' ? val : 'asc';
   })
 
-  const [showDemoViewer, setShowDemoViewer] = useState(false);
-  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(false);
-  const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(null);
+  const [showDemoViewer, setShowDemoViewer] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('demo');
+  });
+  const [hasLoadedDemoViewer, setHasLoadedDemoViewer] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return !!params.get('demo');
+  });
+  const [pendingDemo, setPendingDemo] = useState<{url: string, name: string} | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const demoName = params.get('demo');
+    if (demoName) {
+      const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
+      return { url: demoUrl, name: demoName };
+    }
+    return null;
+  });
 
   const closeViewer = useCallback(() => {
     setShowDemoViewer(false);
@@ -290,11 +490,12 @@ function App() {
     if (sortField !== 'name') params.set('sort', sortField);
     if (sortOrder !== 'asc') params.set('order', sortOrder);
     if (selectedMap) params.set('preview', selectedMap.name);
+    if (pendingDemo) params.set('demo', pendingDemo.name);
 
     const queryString = params.toString();
     const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
     window.history.replaceState(null, '', newRelativePathQuery);
-  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder, selectedMap]);
+  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder, selectedMap, pendingDemo]);
 
   const difficulties = DIFFICULTIES;
   const allPlayers = ALL_PLAYERS;

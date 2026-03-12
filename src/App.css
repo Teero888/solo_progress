@@ -544,79 +544,300 @@ select:hover {
   }
 }
 
-.demo-timeline-controls {
+.text-blue { color: #3b82f6; }
+
+.demo-viewer-content {
+  background: #0f172a;
+  width: 90vw;
+  max-width: 1400px;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  max-height: 90vh;
+  border: 1px solid #334155;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.demo-viewer-header {
+  background: #1e293b;
+  padding: 0.5rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+}
+
+.demo-viewer-header .header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.demo-viewer-header h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.demo-filename {
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: #94a3b8;
+  background: #0f172a;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.demo-viewer-body {
+  position: relative;
+  flex: 1;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-viewer-body iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  z-index: 1;
+}
+
+.demo-timeline-container {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+  background: rgba(15, 23, 42, 0.9);
+  padding: 0.75rem 1rem;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  z-index: 50;
+  border-top: 1px solid #334155;
+}
+
+.demo-timeline-container.hidden {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+
+.demo-scrubber-wrapper {
+  position: relative;
+  width: 100%;
+  height: 20px; /* Large hitbox */
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.demo-scrubber-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  transition: height 0.15s ease;
+}
+
+.demo-scrubber-wrapper:hover .demo-scrubber-track {
+  height: 6px;
+}
+
+.scrubber-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+  z-index: 5;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+
+.demo-viewer-body.dragging .scrubber-progress {
+  transition: none;
+}
+
+.scrubber-handle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  z-index: 10;
+  pointer-events: none;
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), left 0.1s linear;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.demo-viewer-body.dragging .scrubber-handle {
+  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.demo-scrubber-wrapper:hover .scrubber-handle {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.demo-scrubber-wrapper:active .scrubber-handle {
+  transform: translate(-50%, -50%) scale(1.2);
+  background: #3b82f6;
+  border: 2px solid #fff;
+}
+
+.demo-controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controls-left, .controls-right {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid #334155;
-  width: 100%;
-  box-sizing: border-box;
-  z-index: 10;
 }
 
 .demo-play-pause {
-  background: #3b82f6;
-  border: none;
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  background: transparent;
+  border: 1px solid #334155;
+  color: #f8fafc;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.1rem;
-  transition: all 0.2s;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  transition: background 0.2s;
 }
 
 .demo-play-pause:hover {
-  background: #2563eb;
-  transform: scale(1.05);
+  background: #334155;
 }
 
-.demo-scrubber {
-  flex: 1;
-  accent-color: #3b82f6;
-  cursor: pointer;
-  height: 6px;
-}
-
-.demo-speed-controls {
+.demo-time-display {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  color: #94a3b8;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  color: #f8fafc;
-  background: rgba(30, 41, 59, 0.9);
-  padding: 0.3rem 0.6rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  border: 1px solid #334155;
+  gap: 0.3rem;
 }
 
-.demo-speed-controls button {
+.demo-time-display .current {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.demo-speed-selector {
+  display: flex;
+  align-items: center;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.skip-interval-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #1e293b;
+  border: 1px solid #334155;
+  padding: 0 0.4rem;
+  border-radius: 6px;
+  height: 26px;
+}
+
+.skip-interval-selector .label {
+  font-size: 0.7rem;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.skip-interval-selector select {
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  padding: 0;
+}
+
+.skip-interval-selector select option {
+  background: #1e293b;
+}
+
+.speed-btn {
   background: transparent;
   border: none;
   color: #94a3b8;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  font-size: 1.2rem;
-  padding: 0 4px;
-  font-weight: bold;
+  font-size: 1rem;
 }
 
-.demo-speed-controls button:hover {
-  color: #f8fafc;
+.speed-btn:hover {
+  background: #334155;
+  color: #fff;
 }
 
-.demo-speed-controls span {
-  min-width: 45px;
-  text-align: center;
-  font-family: ui-monospace, monospace;
+.speed-value {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.5rem;
+  color: #3b82f6;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-left: 1px solid #334155;
+  border-right: 1px solid #334155;
 }
+
+.maximize-btn {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.maximize-btn:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.demo-status-text {
+  color: #3b82f6;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
