@@ -69,7 +69,7 @@ If you need to update the DDNet WASM engine used for the demo viewer:
 Others are welcome to submit their demos via Pull Requests!
 
 ### Guidelines:
-- **Solo Ranks Only:** The demo must be a valid solo rank.
+- **Solo Ranks Only:** The demo must be a valid solo rank ran on official KoG servers.
 - **No Cheating:** Any demo found to be using cheats, macros, or external assistance will be rejected and removed.
 - **Naming Convention:** Files in `public/demos/` must follow the format:
   `MapName_TimeInSeconds_PlayerName.demo`
