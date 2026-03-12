@@ -45,8 +45,6 @@ jobs:
       - name: Update KoGmaps Submodule
         if: steps.cache-submodule.outputs.cache-hit != 'true'
         run: git submodule update --init --depth 1 public/maps
-      - name: Update other submodules
-        run: git submodule update --init --recursive --depth 1 --exclude public/maps
       - name: Install dependencies & run script
         run: npm ci && python parse_maps.py
       - name: Build
