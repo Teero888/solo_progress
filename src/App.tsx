@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import mapsData from './data/maps.json'
-import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, Minimize2, PlayCircle, Play, Pause } from 'lucide-react'
+import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, Map as MapIcon, User, Award, Trophy, Users, X, Maximize2, Minimize2, PlayCircle, Play, Pause, Download } from 'lucide-react'
 import './App.css'
 
 interface MapEntry {
@@ -101,7 +101,18 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
       >
         <div className="map-name-wrapper">
           {map.name}
-          <Maximize2 size={12} className="preview-icon" />
+          <div className="map-actions">
+            <Maximize2 size={12} className="preview-icon" />
+            <a
+              href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/maps/${map.difficulty.toUpperCase()}/${encodeURIComponent(map.name)}.map`}
+              download={`${map.name}.map`}
+              onClick={(e) => e.stopPropagation()}
+              className="download-map-btn"
+              title="Download Map"
+            >
+              <Download size={14} />
+            </a>
+          </div>
         </div>
         {isMounted && (
           <div

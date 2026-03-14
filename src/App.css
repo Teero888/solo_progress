@@ -245,8 +245,15 @@ select:hover {
 .map-name-wrapper {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.5rem;
   position: relative;
+}
+
+.map-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .preview-icon {
@@ -255,8 +262,27 @@ select:hover {
   transition: opacity 0.2s;
 }
 
-.map-cell:hover .preview-icon {
+.download-map-btn {
+  opacity: 0;
+  color: #64748b;
+  transition: all 0.2s;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.map-cell:hover .preview-icon,
+.map-cell:hover .download-map-btn {
   opacity: 1;
+}
+
+.download-map-btn:hover,
+.preview-icon:hover {
+  color: #3b82f6;
+  transform: translateY(-1px);
 }
 
 .map-row-preview {
@@ -512,6 +538,12 @@ select:hover {
   background: #ec489922;
   color: #ec4899;
   border: 1px solid #ec489944;
+}
+
+.badge-others {
+  background: #94a3b822;
+  color: #94a3b8;
+  border: 1px solid #94a3b844;
 }
 
 .leaderboard {
