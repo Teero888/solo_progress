@@ -77,8 +77,7 @@ Others are welcome to submit their demos via Pull Requests!
 
 ### How to PR:
 1.  Add your `.demo` file to `public/demos/`.
-2.  Run `python parse_maps.py` to update the data.
-3.  Submit a Pull Request with your changes.
+2.  Submit a Pull Request with your changes.
 
 ## License
 
