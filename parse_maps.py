@@ -143,7 +143,7 @@ def get_api_data(map_name, skip_api=False, cache={}):
                     return None
                 data = json.loads(response.read().decode())
                 cache[map_name] = data
-                time.sleep(5) # avoid rate limiting
+                time.sleep(3) # avoid rate limiting
                 return data
         except urllib.error.HTTPError as e:
             if e.code == 429:

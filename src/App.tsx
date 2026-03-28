@@ -144,9 +144,9 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
             {currentPlayer !== 'All Players' && playerProgress ? (
               <div className="status-finished">
                 {playerProgress.verified ? (
-                  <CheckCircle2 className="icon-success" size={16} title="Verified" />
+                  <span title="Verified"><CheckCircle2 className="icon-success" size={16} /></span>
                 ) : (
-                  <Circle className="text-dim" size={16} title="Not Verified" />
+                  <span title="Not Verified"><Circle className="text-dim" size={16} /></span>
                 )}
                 <span className="time-display highlight">{formatTime(playerProgress.time)}</span>
               </div>
