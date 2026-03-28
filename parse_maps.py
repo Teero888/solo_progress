@@ -6,6 +6,8 @@ import json
 import urllib.request
 import urllib.parse
 import shutil
+import time
+import sys
 
 BASE_URL = "https://teero888.github.io/solo_progress/"
 
@@ -25,11 +27,11 @@ def generate_preview_html(map_info):
     stars = map_info["stars"]
     points = map_info["points"]
     creator = map_info["creator"]
-    
+
     # Sanitize for HTML attributes
     safe_name = map_name.replace('"', '&quot;')
     safe_creator = creator.replace('"', '&quot;')
-    
+
     html_content = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -62,12 +64,12 @@ def generate_preview_html(map_info):
 def parse_maps():
     maps = []
     blacklist = load_blacklist()
-    
+
     # Clear old previews
     if os.path.exists('public/preview'):
         shutil.rmtree('public/preview')
     os.makedirs('public/preview', exist_ok=True)
-    
+
     try:
         with open('public/maps/mapinfo.txt', 'r', encoding='utf-8') as f:
             lines = f.readlines()
@@ -99,19 +101,73 @@ def parse_maps():
         }
         maps.append(map_info)
         generate_preview_html(map_info)
-        
+
     return maps
 
-def parse_demos():
-    # MapName -> PlayerName -> BestTime
+def get_api_data(map_name, skip_api=False, cache={}):
+    if skip_api:
+        # Mock data for testing
+        return {
+            "top100": [
+                {"playerName": "Teero", "time": 97.64, "rank": 5},
+                {"playerName": "Knuski", "time": 79.7, "rank": 1}
+            ],
+            "top500": [
+                {"playerName": "SomeOtherPlayer", "time": 150.0, "rank": 450}
+            ]
+        }
+
+    if map_name in cache:
+        return cache[map_name]
+
+    url = f"https://ravenkog.com/api/maps?mapName={urllib.parse.quote(map_name)}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://ravenkog.com/',
+        'Connection': 'keep-alive',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'Priority': 'u=0, i'
+    }
+    retries = 3
+    for i in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                content_type = response.info().get_content_type()
+                if 'application/json' not in content_type:
+                    print(f"Non-JSON response for {map_name}: {content_type}. Bot protection triggered?")
+                    return None
+                data = json.loads(response.read().decode())
+                cache[map_name] = data
+                time.sleep(5) # avoid rate limiting
+                return data
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait_time = (i + 1) * 2
+                print(f"Rate limited for {map_name}, waiting {wait_time}s...")
+                time.sleep(wait_time)
+                continue
+            print(f"HTTP Error fetching API data for {map_name}: {e}")
+            return None
+        except Exception as e:
+            print(f"Error fetching API data for {map_name}: {e}")
+            return None
+    return None
+
+def parse_demos(skip_api=False):
+    # MapName -> PlayerName -> { time, verified, rank }
     progress = {}
     if not os.path.exists('public/demos'):
         return progress
 
+    # First pass: collect best times from local demos
+    raw_progress = {}
     for filename in os.listdir('public/demos'):
         if filename.endswith('.demo'):
-            # Format: MapName_TimeInSeconds_PlayerName.demo
-            # Use regex to find the time (float) which separates map name and player name
             match = re.search(r'(.+)_(\d+\.\d+)_([^/]+)\.demo', filename)
             if match:
                 map_name = match.group(1)
@@ -121,15 +177,55 @@ def parse_demos():
                     continue
                 player_name = match.group(3)
 
-                if map_name not in progress:
-                    progress[map_name] = {}
+                if map_name not in raw_progress:
+                    raw_progress[map_name] = {}
 
-                if player_name not in progress[map_name] or time < progress[map_name][player_name]:
-                    progress[map_name][player_name] = time
+                if player_name not in raw_progress[map_name] or time < raw_progress[map_name][player_name]:
+                    raw_progress[map_name][player_name] = time
+
+    # Second pass: verify against API
+    count = 0
+    total = len(raw_progress)
+    for map_name, players in raw_progress.items():
+        count += 1
+        if not skip_api:
+            print(f"[{count}/{total}] Fetching API data for {map_name}...")
+
+        progress[map_name] = {}
+        api_data = get_api_data(map_name, skip_api=skip_api)
+
+        if api_data:
+            # Create a lookup for API data across ALL keys starting with "top"
+            # key: (playerName, time)
+            api_lookup = {}
+            for key, value in api_data.items():
+                if key.startswith("top") and isinstance(value, list):
+                    for entry in value:
+                        # Round time to 3 decimal places for comparison
+                        entry_time = round(float(entry["time"]), 3)
+                        api_lookup[(entry["playerName"], entry_time)] = entry["rank"]
+
+            for player_name, time in players.items():
+                # Round local time to 3 decimal places
+                local_time = round(time, 3)
+                rank = api_lookup.get((player_name, local_time))
+                progress[map_name][player_name] = {
+                    "time": time,
+                    "verified": rank is not None,
+                    "rank": rank
+                }
+        else:
+            for player_name, time in players.items():
+                progress[map_name][player_name] = {
+                    "time": time,
+                    "verified": False,
+                    "rank": None
+                }
     return progress
 
+skip_api = "--skip-api" in sys.argv
 maps = parse_maps()
-progress = parse_demos()
+progress = parse_demos(skip_api=skip_api)
 
 # Combine data
 data = {
