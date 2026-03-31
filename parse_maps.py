@@ -8,6 +8,7 @@ import urllib.parse
 import shutil
 import time
 import sys
+import datetime
 
 BASE_URL = "https://teero888.github.io/solo_progress/"
 
@@ -132,33 +133,53 @@ def get_api_data(map_name, skip_api=False, cache={}):
         'Sec-Fetch-Site': 'same-origin',
         'Priority': 'u=0, i'
     }
+
+    def get_wait_time(headers):
+        remaining = headers.get('x-ratelimit-remaining')
+        reset = headers.get('x-ratelimit-reset')
+        if remaining is not None and int(remaining) == 0 and reset:
+            try:
+                # reset is ISO 8601 (e.g. 2026-03-31T06:10:59.567Z)
+                # Python's fromisoformat might not like 'Z' in older versions, 
+                # but we're on 3.14 which should be fine.
+                reset_dt = datetime.datetime.fromisoformat(reset.replace('Z', '+00:00'))
+                now_dt = datetime.datetime.now(datetime.timezone.utc)
+                wait = (reset_dt - now_dt).total_seconds()
+                return max(0, wait + 1) # +1s buffer
+            except: pass
+        return 1 # Default sleep if not exhausted
+
     retries = 3
     for i in range(retries):
+        sleep_duration = 1
         try:
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=10) as response:
+                sleep_duration = get_wait_time(response.info())
                 content_type = response.info().get_content_type()
                 if 'application/json' not in content_type:
                     print(f"Non-JSON response for {map_name}: {content_type}. Bot protection triggered?")
                     return None
                 data = json.loads(response.read().decode())
                 cache[map_name] = data
-                time.sleep(3) # avoid rate limiting
                 return data
         except urllib.error.HTTPError as e:
+            sleep_duration = get_wait_time(e.headers)
             if e.code == 429:
-                wait_time = (i + 1) * 2
-                print(f"Rate limited for {map_name}, waiting {wait_time}s...")
-                time.sleep(wait_time)
+                print(f"Rate limited for {map_name}, waiting {sleep_duration:.1f}s...")
+                time.sleep(sleep_duration)
                 continue
             print(f"HTTP Error fetching API data for {map_name}: {e}")
             return None
         except Exception as e:
             print(f"Error fetching API data for {map_name}: {e}")
             return None
+        finally:
+            if not skip_api:
+                time.sleep(sleep_duration)
     return None
 
-def parse_demos(skip_api=False):
+def parse_demos(skip_api=False, existing_progress=None):
     # MapName -> PlayerName -> { time, verified, rank }
     progress = {}
     if not os.path.exists('public/demos'):
@@ -188,6 +209,33 @@ def parse_demos(skip_api=False):
     total = len(raw_progress)
     for map_name, players in raw_progress.items():
         count += 1
+        
+        # Check if we can skip the API call for this map
+        needs_api = False
+        if skip_api:
+            needs_api = False
+        elif not existing_progress or map_name not in existing_progress:
+            needs_api = True
+        else:
+            for player_name, current_time in players.items():
+                existing = existing_progress[map_name].get(player_name)
+                if not existing or not existing.get("verified"):
+                    needs_api = True
+                    break
+                # If current local time is different (better or worse) from the one we verified before
+                if round(current_time, 3) != round(existing.get("time", 0), 3):
+                    needs_api = True
+                    break
+        
+        if not needs_api:
+            if not skip_api:
+                print(f"[{count}/{total}] Skipping API for {map_name} (already verified)")
+            progress[map_name] = {}
+            for player_name, current_time in players.items():
+                # We know it's in existing_progress because needs_api is False
+                progress[map_name][player_name] = existing_progress[map_name][player_name]
+            continue
+
         if not skip_api:
             print(f"[{count}/{total}] Fetching API data for {map_name}...")
 
@@ -223,9 +271,22 @@ def parse_demos(skip_api=False):
                 }
     return progress
 
+def load_existing_data():
+    file_path = 'src/data/maps.json'
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Warning: Could not load existing maps.json: {e}")
+    return None
+
 skip_api = "--skip-api" in sys.argv
+existing_data = load_existing_data()
+existing_progress = existing_data.get("progress") if existing_data else None
+
 maps = parse_maps()
-progress = parse_demos(skip_api=skip_api)
+progress = parse_demos(skip_api=skip_api, existing_progress=existing_progress)
 
 # Combine data
 data = {
