@@ -14,27 +14,21 @@ interface MapEntry {
   date: string;
 }
 
-interface ProgressEntry {
-  time: number;
-  verified: boolean;
-  rank: number | null;
-}
-
 interface MapsJson {
   maps: MapEntry[];
-  progress: Record<string, Record<string, ProgressEntry>>;
+  progress: Record<string, Record<string, number>>;
   players: string[];
 }
 
 const data = mapsData as MapsJson;
 
-type SortField = keyof MapEntry | 'time' | 'rank';
+type SortField = keyof MapEntry | 'time';
 
 const DIFFICULTIES = ['All', 'Easy', 'Main', 'Hard', 'Insane', 'Extreme', 'Mod', 'Others'];
 const LENGTHS = ['All', 'XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-'];
 const LENGTH_ORDER = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL', 'WTF', '-'];
 const ALL_PLAYERS = ['All Players', ...data.players.sort()];
-const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time', 'rank'];
+const VALID_SORT_FIELDS: SortField[] = ['name', 'difficulty', 'stars', 'stars_count', 'points', 'length', 'creator', 'date', 'time'];
 const VALID_STATUS = ['All', 'Finished', 'Pending'];
 
 const SKIP_OPTIONS = [0.5, 1, 2, 5, 10];
@@ -49,7 +43,7 @@ let globalZIndex = 1000;
 
 const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDemo }: {
   map: MapEntry,
-  mapProgress: Record<string, ProgressEntry>,
+  mapProgress: Record<string, number>,
   currentPlayer: string,
   onSelect: (map: { name: string, difficulty: string }) => void,
   onPlayDemo: (e: React.MouseEvent, mapName: string, player: string, time: number) => void
@@ -60,12 +54,12 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
   const [zIndex, setZIndex] = useState(1000);
   const leaveTimeoutRef = useRef<number | null>(null);
 
-  const playerProgress = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
+  const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
   const isFinished = Object.keys(mapProgress).length > 0;
 
   // Sort leaderboard
   const leaderboard = useMemo(() => Object.entries(mapProgress)
-    .sort(([, a], [, b]) => a.time - b.time), [mapProgress]);
+    .sort(([, a], [, b]) => a - b), [mapProgress]);
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
@@ -97,7 +91,7 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
 
   return (
     <tr
-      className={playerProgress || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
+      className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
     >
       <td
         className="font-bold map-cell"
@@ -141,27 +135,22 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
       <td>
         {isFinished ? (
           <div className="leaderboard">
-            {currentPlayer !== 'All Players' && playerProgress ? (
+            {currentPlayer !== 'All Players' && playerTime ? (
               <div className="status-finished">
-                {playerProgress.verified ? (
-                  <CheckCircle2 className="icon-success" size={16} title="Verified" />
-                ) : (
-                  <Circle className="text-dim" size={16} title="Not Verified" />
-                )}
-                <span className="time-display highlight">{formatTime(playerProgress.time)}</span>
+                <CheckCircle2 className="icon-success" size={16} />
+                <span className="time-display highlight">{formatTime(playerTime)}</span>
               </div>
             ) : null}
 
             <div className="top-finishers">
-              {leaderboard.slice(0, 3).map(([player, entry], idx) => (
-                <div key={player} className="finisher-tag" title={`${player}: ${formatTime(entry.time)}`}>
+              {leaderboard.slice(0, 3).map(([player, time], idx) => (
+                <div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
                   {idx === 0 && <Trophy size={10} className="icon-gold" />}
                   <span className="finisher-name">{player}</span>
-                  <span className="finisher-time">{formatTime(entry.time)}</span>
-                  {entry.verified && <CheckCircle2 size={10} className="icon-success ml-1" />}
+                  <span className="finisher-time">{formatTime(time)}</span>
                   <button
                     className="play-demo-btn"
-                    onClick={(e) => onPlayDemo(e, map.name, player, entry.time)}
+                    onClick={(e) => onPlayDemo(e, map.name, player, time)}
                     title="Play Demo"
                   >
                     <PlayCircle size={12} />
@@ -173,21 +162,6 @@ const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDe
           </div>
         ) : (
           <Circle className="text-dim" size={18} />
-        )}
-      </td>
-      <td className="text-center">
-        {currentPlayer !== 'All Players' ? (
-          playerProgress?.rank !== null && playerProgress?.rank !== undefined ? (
-            <span className="rank-badge">Rank {playerProgress.rank}</span>
-          ) : playerProgress ? (
-            <span className="text-dim text-xs">Unverified</span>
-          ) : null
-        ) : (
-          (() => {
-            const ranks = Object.values(mapProgress).map(e => e.rank).filter((r): r is number => typeof r === 'number');
-            const bestRank = ranks.length > 0 ? Math.min(...ranks) : Infinity;
-            return bestRank !== Infinity ? <span className="rank-badge">Rank {bestRank}</span> : (Object.keys(mapProgress).length > 0 ? <span className="text-dim text-xs">Unverified</span> : null);
-          })()
         )}
       </td>
     </tr>
@@ -935,21 +909,10 @@ function App() {
   const getMapTime = (mapName: string) => {
     const mapProgress = data.progress[mapName] || {};
     if (currentPlayer === 'All Players') {
-      const entries = Object.values(mapProgress);
-      return entries.length > 0 ? Math.min(...entries.map(e => e.time)) : Infinity;
+      const times = Object.values(mapProgress);
+      return times.length > 0 ? Math.min(...times) : Infinity;
     }
-    return mapProgress[currentPlayer]?.time ?? Infinity;
-  };
-
-  const getMapRank = (mapName: string) => {
-    const mapProgress = data.progress[mapName] || {};
-    if (currentPlayer === 'All Players') {
-      const entries = Object.values(mapProgress);
-      const ranks = entries.map(e => e.rank).filter((r): r is number => typeof r === 'number');
-      return ranks.length > 0 ? Math.min(...ranks) : Infinity;
-    }
-    const rank = mapProgress[currentPlayer]?.rank;
-    return (rank === null || rank === undefined) ? Infinity : rank;
+    return mapProgress[currentPlayer] ?? Infinity;
   };
 
   const filteredMaps = useMemo(() => {
@@ -978,9 +941,6 @@ function App() {
         if (sortField === 'time') {
           valA = getMapTime(a.name);
           valB = getMapTime(b.name);
-        } else if (sortField === 'rank') {
-          valA = getMapRank(a.name);
-          valB = getMapRank(b.name);
         } else if (sortField === 'difficulty') {
           valA = DIFFICULTIES.indexOf(a.difficulty);
           valB = DIFFICULTIES.indexOf(b.difficulty);
@@ -1008,7 +968,7 @@ function App() {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
-      setSortOrder(field === 'time' || field === 'rank' ? 'asc' : 'asc');
+      setSortOrder(field === 'time' ? 'asc' : 'asc'); // Usually want fastest first
     }
   }
 
@@ -1129,10 +1089,7 @@ function App() {
                 <User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
               <th onClick={() => toggleSort('time')} className="sortable">
-                <Clock size={16} /> Time {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('rank')} className="sortable">
-                <Trophy size={16} /> Rank {sortField === 'rank' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+                <Clock size={16} /> Time / Leaderboard {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
               </th>
             </tr>
           </thead>
