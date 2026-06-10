@@ -1,5 +1,5 @@
 /*! coi-serviceworker v0.1.7-mod | MIT License | https://github.com/gzuidhof/coi-serviceworker */
-const VERSION = "1.0.4";
+const VERSION = "1.0.5";
 
 if (typeof window === 'undefined') {
     const CACHE_NAME = `ddnet-assets-v${VERSION}`;
