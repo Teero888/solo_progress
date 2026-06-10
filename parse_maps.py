@@ -105,36 +105,54 @@ def parse_maps():
 def parse_demos():
     # MapName -> PlayerName -> BestTime
     progress = {}
-    if not os.path.exists('public/demos'):
-        return progress
+    # MapName -> PlayerName -> ActualFilename
+    filenames = {}
+    base_dir = 'public/demos'
 
-    for filename in os.listdir('public/demos'):
-        if filename.endswith('.demo'):
-            # Format: MapName_TimeInSeconds_PlayerName.demo
-            # Use regex to find the time (float) which separates map name and player name
-            match = re.search(r'(.+)_(\d+\.\d+)_([^/]+)\.demo', filename)
-            if match:
-                map_name = match.group(1)
-                try:
-                    time = float(match.group(2))
-                except ValueError:
-                    continue
-                player_name = match.group(3)
+    if not os.path.exists(base_dir):
+        return progress, filenames
 
-                if map_name not in progress:
-                    progress[map_name] = {}
+    # Iterate through the items in public/demos
+    for player_name in os.listdir(base_dir):
+        player_dir = os.path.join(base_dir, player_name)
 
-                if player_name not in progress[map_name] or time < progress[map_name][player_name]:
-                    progress[map_name][player_name] = time
-    return progress
+        # Only process directories (ignoring any stray files in the root public/demos)
+        if not os.path.isdir(player_dir):
+            continue
+
+        # Iterate through the .demo files inside the specific player's directory
+        for filename in os.listdir(player_dir):
+            if filename.endswith('.demo'):
+                # Format: MapName_TimeInSeconds_IgnoredPlayerName.demo
+                # The regex captures Group 1 (MapName) and Group 2 (Time), and ignores the rest (.*)
+                match = re.search(r'(.+)_(\d+\.\d+)_.*\.demo', filename)
+                if match:
+                    map_name = match.group(1)
+                    try:
+                        time = float(match.group(2))
+                    except ValueError:
+                        continue
+
+                    # Initialize map dictionary if it doesn't exist
+                    if map_name not in progress:
+                        progress[map_name] = {}
+                    if map_name not in filenames:
+                        filenames[map_name] = {}
+
+                    # Check against the current best time using the FOLDER name (player_name)
+                    if player_name not in progress[map_name] or time < progress[map_name][player_name]:
+                        progress[map_name][player_name] = time
+                        filenames[map_name][player_name] = filename
+    return progress, filenames
 
 maps = parse_maps()
-progress = parse_demos()
+progress, filenames = parse_demos()
 
 # Combine data
 data = {
     "maps": maps,
     "progress": progress,
+    "filenames": filenames,
     "players": list(set(p for m in progress.values() for p in m.keys()))
 }
 

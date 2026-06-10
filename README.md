@@ -71,12 +71,12 @@ Others are welcome to submit their demos via Pull Requests!
 ### Guidelines:
 - **Solo Ranks Only:** The demo must be a valid solo rank, it can be done on any servers.
 - **No Cheating:** Any demo found to be using cheats, macros, or external assistance will be rejected and removed.
-- **Naming Convention:** Files in `public/demos/` must follow the format:
+- **Naming Convention:** Files in `public/demos/<PlayerName>/` must follow the format:
   `MapName_TimeInSeconds_PlayerName.demo`
-  (e.g., `ExampleMap_123.456_Teero.demo`)
+  (e.g., `public/demos/Teero/ExampleMap_123.456_Teero.demo`)
 
 ### How to PR:
-1.  Add your `.demo` file to `public/demos/`.
+1.  Add your `.demo` file to `public/demos/<PlayerName>/`.
 2.  Submit a Pull Request with your changes.
 
 ## License

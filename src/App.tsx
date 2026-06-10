@@ -4,20 +4,21 @@ import { Search, Filter, CheckCircle2, Circle, SortAsc, SortDesc, Clock, Star, M
 import './App.css'
 
 interface MapEntry {
-  name: string;
-  difficulty: string;
-  stars: string;
-  stars_count: number;
-  points: number;
-  length: string;
-  creator: string;
-  date: string;
+	name: string;
+	difficulty: string;
+	stars: string;
+	stars_count: number;
+	points: number;
+	length: string;
+	creator: string;
+	date: string;
 }
 
 interface MapsJson {
-  maps: MapEntry[];
-  progress: Record<string, Record<string, number>>;
-  players: string[];
+	maps: MapEntry[];
+	progress: Record<string, Record<string, number>>;
+	filenames: Record<string, Record<string, string>>;
+	players: string[];
 }
 
 const data = mapsData as MapsJson;
@@ -34,1103 +35,1121 @@ const VALID_STATUS = ['All', 'Finished', 'Pending'];
 const SKIP_OPTIONS = [0.5, 1, 2, 5, 10];
 
 const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(3);
-  return `${mins}:${secs.padStart(6, '0')}`;
+	const mins = Math.floor(seconds / 60);
+	const secs = (seconds % 60).toFixed(3);
+	return `${mins}:${secs.padStart(6, '0')}`;
 };
 
 let globalZIndex = 1000;
 
-const MapRow = React.memo(({ map, mapProgress, currentPlayer, onSelect, onPlayDemo }: {
-  map: MapEntry,
-  mapProgress: Record<string, number>,
-  currentPlayer: string,
-  onSelect: (map: { name: string, difficulty: string }) => void,
-  onPlayDemo: (e: React.MouseEvent, mapName: string, player: string, time: number) => void
+const MapRow = React.memo(({ map, mapProgress, mapDemoFiles, currentPlayer, onSelect, onPlayDemo }: {
+	map: MapEntry,
+	mapProgress: Record<string, number>,
+	mapDemoFiles: Record<string, string>,
+	currentPlayer: string,
+	onSelect: (map: { name: string, difficulty: string }) => void,
+	onPlayDemo: (e: React.MouseEvent, mapName: string, player: string, filename: string) => void
 }) => {
-  const [isMounted, setIsMounted] = useState(false);
-  const [isShowing, setIsShowing] = useState(false);
-  const [hoverY, setHoverY] = useState(0);
-  const [zIndex, setZIndex] = useState(1000);
-  const leaveTimeoutRef = useRef<number | null>(null);
+	const [isMounted, setIsMounted] = useState(false);
+	const [isShowing, setIsShowing] = useState(false);
+	const [hoverY, setHoverY] = useState(0);
+	const [zIndex, setZIndex] = useState(1000);
+	const leaveTimeoutRef = useRef<number | null>(null);
 
-  const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
-  const isFinished = Object.keys(mapProgress).length > 0;
+	const playerTime = currentPlayer === 'All Players' ? null : mapProgress[currentPlayer];
+	const isFinished = Object.keys(mapProgress).length > 0;
 
-  // Sort leaderboard
-  const leaderboard = useMemo(() => Object.entries(mapProgress)
-    .sort(([, a], [, b]) => a - b), [mapProgress]);
+	// Sort leaderboard
+	const leaderboard = useMemo(() => Object.entries(mapProgress)
+		.sort(([, a], [, b]) => a - b), [mapProgress]);
 
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverY(rect.top + rect.height / 2);
+	const handleMouseEnter = (e: React.MouseEvent) => {
+		if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
+		const rect = e.currentTarget.getBoundingClientRect();
+		setHoverY(rect.top + rect.height / 2);
 
-    globalZIndex++;
-    setZIndex(globalZIndex);
+		globalZIndex++;
+		setZIndex(globalZIndex);
 
-    setIsMounted(true);
-    // Use requestAnimationFrame or setTimeout(0) to ensure the mount is processed before triggering the show animation
-    requestAnimationFrame(() => {
-      setIsShowing(true);
-    });
-  };
+		setIsMounted(true);
+		// Use requestAnimationFrame or setTimeout(0) to ensure the mount is processed before triggering the show animation
+		requestAnimationFrame(() => {
+			setIsShowing(true);
+		});
+	};
 
-  const handleMouseLeave = () => {
-    setIsShowing(false);
-    leaveTimeoutRef.current = window.setTimeout(() => {
-      setIsMounted(false);
-    }, 300); // Must match CSS transition duration
-  };
+	const handleMouseLeave = () => {
+		setIsShowing(false);
+		leaveTimeoutRef.current = window.setTimeout(() => {
+			setIsMounted(false);
+		}, 300); // Must match CSS transition duration
+	};
 
-  useEffect(() => {
-    return () => {
-      if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
-    };
-  }, []);
+	useEffect(() => {
+		return () => {
+			if (leaveTimeoutRef.current) window.clearTimeout(leaveTimeoutRef.current);
+		};
+	}, []);
 
-  return (
-    <tr
-      className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
-    >
-      <td
-        className="font-bold map-cell"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={() => onSelect({ name: map.name, difficulty: map.difficulty })}
-      >
-        <div className="map-name-wrapper">
-          {map.name}
-          <div className="map-actions">
-            <Maximize2 size={12} className="preview-icon" />
-            <a
-              href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/maps/${map.difficulty.toUpperCase()}/${encodeURIComponent(map.name)}.map`}
-              download={`${map.name}.map`}
-              onClick={(e) => e.stopPropagation()}
-              className="download-map-btn"
-              title="Download Map"
-            >
-              <Download size={14} />
-            </a>
-          </div>
-        </div>
-        {isMounted && (
-          <div
-            className={`map-row-preview ${isShowing ? 'visible' : ''}`}
-            style={{ top: hoverY, zIndex }}
-          >
-            <MapPreview mapName={map.name} difficulty={map.difficulty} />
-          </div>
-        )}
-      </td>
-      <td>
-        <span className={`badge badge-${map.difficulty.toLowerCase()}`}>
-          {map.difficulty}
-        </span>
-      </td>
-      <td className="stars">{map.stars}</td>
-      <td className="font-mono">{map.points}</td>
-      <td className="font-mono text-center">{map.length}</td>
-      <td className="text-dim">{map.creator}</td>
-      <td>
-        {isFinished ? (
-          <div className="leaderboard">
-            {currentPlayer !== 'All Players' && playerTime ? (
-              <div className="status-finished">
-                <CheckCircle2 className="icon-success" size={16} />
-                <span className="time-display highlight">{formatTime(playerTime)}</span>
-              </div>
-            ) : null}
+	return (
+		<tr
+			className={playerTime || (currentPlayer === 'All Players' && isFinished) ? 'row-finished' : ''}
+		>
+			<td
+				className="font-bold map-cell"
+				onMouseEnter={handleMouseEnter}
+				onMouseLeave={handleMouseLeave}
+				onClick={() => onSelect({ name: map.name, difficulty: map.difficulty })}
+			>
+				<div className="map-name-wrapper">
+					{map.name}
+					<div className="map-actions">
+						<Maximize2 size={12} className="preview-icon" />
+						<a
+							href={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/maps/${map.difficulty.toUpperCase()}/${encodeURIComponent(map.name)}.map`}
+							download={`${map.name}.map`}
+							onClick={(e) => e.stopPropagation()}
+							className="download-map-btn"
+							title="Download Map"
+						>
+							<Download size={14} />
+						</a>
+					</div>
+				</div>
+				{isMounted && (
+					<div
+						className={`map-row-preview ${isShowing ? 'visible' : ''}`}
+						style={{ top: hoverY, zIndex }}
+					>
+						<MapPreview mapName={map.name} difficulty={map.difficulty} />
+					</div>
+				)}
+			</td>
+			<td>
+				<span className={`badge badge-${map.difficulty.toLowerCase()}`}>
+					{map.difficulty}
+				</span>
+			</td>
+			<td className="stars">{map.stars}</td>
+			<td className="font-mono">{map.points}</td>
+			<td className="font-mono text-center">{map.length}</td>
+			<td className="text-dim">{map.creator}</td>
+			<td>
+				{isFinished ? (
+					<div className="leaderboard">
+						{currentPlayer !== 'All Players' && playerTime ? (
+							<div className="status-finished">
+								<CheckCircle2 className="icon-success" size={16} />
+								<span className="time-display highlight">{formatTime(playerTime)}</span>
+							</div>
+						) : null}
 
-            <div className="top-finishers">
-              {leaderboard.slice(0, 3).map(([player, time], idx) => (
-                <div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
-                  {idx === 0 && <Trophy size={10} className="icon-gold" />}
-                  <span className="finisher-name">{player}</span>
-                  <span className="finisher-time">{formatTime(time)}</span>
-                  <button
-                    className="play-demo-btn"
-                    onClick={(e) => onPlayDemo(e, map.name, player, time)}
-                    title="Play Demo"
-                  >
-                    <PlayCircle size={12} />
-                  </button>
-                </div>
-              ))}
-              {leaderboard.length > 3 && <span className="more-count">+{leaderboard.length - 3} more</span>}
-            </div>
-          </div>
-        ) : (
-          <Circle className="text-dim" size={18} />
-        )}
-      </td>
-    </tr>
-  );
+						<div className="top-finishers">
+							{leaderboard.slice(0, 3).map(([player, time], idx) => (
+								<div key={player} className="finisher-tag" title={`${player}: ${formatTime(time)}`}>
+									{idx === 0 && <Trophy size={10} className="icon-gold" />}
+									<span className="finisher-name">{player}</span>
+									<span className="finisher-time">{formatTime(time)}</span>
+									<button
+										className="play-demo-btn"
+										onClick={(e) => onPlayDemo(e, map.name, player, mapDemoFiles[player])}
+										title="Play Demo"
+									>
+										<PlayCircle size={12} />
+									</button>
+								</div>
+							))}
+							{leaderboard.length > 3 && <span className="more-count">+{leaderboard.length - 3} more</span>}
+						</div>
+					</div>
+				) : (
+					<Circle className="text-dim" size={18} />
+				)}
+			</td>
+		</tr>
+	);
 });
 
 function DemoViewer({ show, hasLoaded, pendingDemo, onClose, iframeRef }: { show: boolean, hasLoaded: boolean, pendingDemo: { url: string, name: string } | null, onClose: () => void, iframeRef: React.RefObject<HTMLIFrameElement | null> }) {
-  const [demoState, setDemoState] = useState<{ isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number } | null>(null);
-  const [showControls, setShowControls] = useState(true);
-  const [skipInterval, setSkipInterval] = useState(5);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [playIndicator, setPlayIndicator] = useState<'play' | 'pause' | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [demoLoaded, setDemoLoaded] = useState(false);
-  const [indicatorKey, setIndicatorKey] = useState(0);
-  const indicatorTimeoutRef = useRef<number | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [copyKey, setCopyKey] = useState(0);
-  const shareTimeoutRef = useRef<number | null>(null);
-  const [viewerKey, setViewerKey] = useState(0);
-  const startedOnOverlayRef = useRef(false);
+	const [demoState, setDemoState] = useState<{ isPaused: number, speed: number, firstTick: number, currentTick: number, lastTick: number } | null>(null);
+	const [showControls, setShowControls] = useState(true);
+	const [skipInterval, setSkipInterval] = useState(5);
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [playIndicator, setPlayIndicator] = useState<'play' | 'pause' | null>(null);
+	const [hasStarted, setHasStarted] = useState(false);
+	const [demoLoaded, setDemoLoaded] = useState(false);
+	const [indicatorKey, setIndicatorKey] = useState(0);
+	const indicatorTimeoutRef = useRef<number | null>(null);
+	const [copied, setCopied] = useState(false);
+	const [copyKey, setCopyKey] = useState(0);
+	const shareTimeoutRef = useRef<number | null>(null);
+	const [viewerKey, setViewerKey] = useState(0);
+	const startedOnOverlayRef = useRef(false);
 
-  const triggerIndicator = (type: 'play' | 'pause') => {
-    setPlayIndicator(type);
-    setIndicatorKey(prev => prev + 1);
-    if (indicatorTimeoutRef.current) window.clearTimeout(indicatorTimeoutRef.current);
-    indicatorTimeoutRef.current = window.setTimeout(() => {
-      setPlayIndicator(null);
-    }, 500);
-  };
+	const triggerIndicator = (type: 'play' | 'pause') => {
+		setPlayIndicator(type);
+		setIndicatorKey(prev => prev + 1);
+		if (indicatorTimeoutRef.current) window.clearTimeout(indicatorTimeoutRef.current);
+		indicatorTimeoutRef.current = window.setTimeout(() => {
+			setPlayIndicator(null);
+		}, 500);
+	};
 
-  const handleShare = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!pendingDemo) return;
+	const handleShare = (e: React.MouseEvent) => {
+		e.stopPropagation();
+		if (!pendingDemo) return;
 
-    const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
-    const shareUrl = `${window.location.origin}${baseUrl}/?demo=${encodeURIComponent(pendingDemo.name)}`;
-    navigator.clipboard.writeText(shareUrl);
+		const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+		const shareUrl = `${window.location.origin}${baseUrl}/?demo=${encodeURIComponent(pendingDemo.name)}`;
+		navigator.clipboard.writeText(shareUrl);
 
-    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
+		if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
 
-    setCopied(true);
-    setCopyKey(prev => prev + 1);
+		setCopied(true);
+		setCopyKey(prev => prev + 1);
 
-    shareTimeoutRef.current = window.setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-  };
+		shareTimeoutRef.current = window.setTimeout(() => {
+			setCopied(false);
+		}, 2000);
+	};
 
-  const controlsTimeoutRef = useRef<number | null>(null);
-  const scrubberRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+	const controlsTimeoutRef = useRef<number | null>(null);
+	const scrubberRef = useRef<HTMLDivElement>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [isDragging, setIsDragging] = useState(false);
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+	useEffect(() => {
+		const handleFullscreenChange = () => {
+			setIsFullscreen(!!document.fullscreenElement);
+		};
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+		document.addEventListener('fullscreenchange', handleFullscreenChange);
+		return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+	}, []);
 
-  const toggleFullscreen = () => {
-    if (!isFullscreen) {
-      containerRef.current?.requestFullscreen();
-    } else {
-      document.exitFullscreen();
-    }
-  };
+	const toggleFullscreen = () => {
+		if (!isFullscreen) {
+			containerRef.current?.requestFullscreen();
+		} else {
+			document.exitFullscreen();
+		}
+	};
 
-  // Use a ref to access the latest state in the event listener without re-attaching it
-  const stateRef = useRef(demoState);
-  const skipIntervalRef = useRef(skipInterval);
+	// Use a ref to access the latest state in the event listener without re-attaching it
+	const stateRef = useRef(demoState);
+	const skipIntervalRef = useRef(skipInterval);
 
-  useEffect(() => {
-    stateRef.current = demoState;
-  }, [demoState]);
+	useEffect(() => {
+		stateRef.current = demoState;
+	}, [demoState]);
 
-  useEffect(() => {
-    skipIntervalRef.current = skipInterval;
-  }, [skipInterval]);
+	useEffect(() => {
+		skipIntervalRef.current = skipInterval;
+	}, [skipInterval]);
 
-  const resetControlsTimer = useCallback(() => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
-    controlsTimeoutRef.current = window.setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
-  }, []);
+	const resetControlsTimer = useCallback(() => {
+		setShowControls(true);
+		if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+		controlsTimeoutRef.current = window.setTimeout(() => {
+			setShowControls(false);
+		}, 3000);
+	}, []);
 
-  const formatTick = (tick: number) => {
-    const seconds = Math.max(0, Math.floor(tick / 50));
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+	const formatTick = (tick: number) => {
+		const seconds = Math.max(0, Math.floor(tick / 50));
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	};
 
-  useEffect(() => {
-    if (show && pendingDemo && iframeRef.current) {
-      setHasStarted(false);
-      setDemoLoaded(false);
-      iframeRef.current.focus();
-      const timer = setTimeout(() => {
-        iframeRef.current?.contentWindow?.postMessage({
-          type: 'playDemo',
-          demoUrl: pendingDemo.url,
-          demoName: pendingDemo.name
-        }, '*');
-        
-        // Start paused
-        setTimeout(() => {
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: 1 }, '*');
-        }, 100);
-      }, 500);
-      resetControlsTimer();
-      return () => clearTimeout(timer);
-    }
-  }, [show, pendingDemo, resetControlsTimer, iframeRef]);
+	useEffect(() => {
+		if (show && pendingDemo && iframeRef.current) {
+			setHasStarted(false);
+			setDemoLoaded(false);
+			iframeRef.current.focus();
+			const timer = setTimeout(() => {
+				iframeRef.current?.contentWindow?.postMessage({
+					type: 'playDemo',
+					demoUrl: pendingDemo.url,
+					demoName: pendingDemo.name.split('/').pop() || pendingDemo.name
+				}, '*');
 
-  // Keep focus on the iframe at all times when shown
-  useEffect(() => {
-    if (!show || !iframeRef.current) return;
+				// Start paused
+				setTimeout(() => {
+					iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: 1 }, '*');
+				}, 100);
+			}, 500);
+			resetControlsTimer();
+			return () => clearTimeout(timer);
+		}
+	}, [show, pendingDemo, resetControlsTimer, iframeRef]);
 
-    const focusIframe = () => {
-      if (iframeRef.current && document.activeElement !== iframeRef.current) {
-        iframeRef.current.focus();
-      }
-    };
+	// Keep focus on the iframe at all times when shown
+	useEffect(() => {
+		if (!show || !iframeRef.current) return;
 
-    const handleUserInteraction = () => {
-      if (iframeRef.current) {
-        iframeRef.current.focus();
-        // Always ping resumeAudio on interaction to unlock audio context in the iframe
-        iframeRef.current.contentWindow?.postMessage({ type: 'resumeAudio' }, '*');
-      }
-    };
+		const focusIframe = () => {
+			if (iframeRef.current && document.activeElement !== iframeRef.current) {
+				iframeRef.current.focus();
+			}
+		};
 
-    // Focus immediately and frequently
-    focusIframe();
-    const intervalId = setInterval(focusIframe, 50);
+		const handleUserInteraction = () => {
+			if (iframeRef.current) {
+				iframeRef.current.focus();
+				// Always ping resumeAudio on interaction to unlock audio context in the iframe
+				iframeRef.current.contentWindow?.postMessage({ type: 'resumeAudio' }, '*');
+			}
+		};
 
-    // Also focus whenever anything happens that might steal focus
-    window.addEventListener('focus', focusIframe);
-    document.addEventListener('mousedown', handleUserInteraction);
-    document.addEventListener('touchstart', handleUserInteraction);
-    document.addEventListener('keydown', handleUserInteraction);
+		// Focus immediately and frequently
+		focusIframe();
+		const intervalId = setInterval(focusIframe, 50);
 
-    return () => {
-      clearInterval(intervalId);
-      window.removeEventListener('focus', focusIframe);
-      document.removeEventListener('mousedown', handleUserInteraction);
-      document.removeEventListener('touchstart', handleUserInteraction);
-      document.removeEventListener('keydown', handleUserInteraction);
-    };
-  }, [show, iframeRef]);
+		// Also focus whenever anything happens that might steal focus
+		window.addEventListener('focus', focusIframe);
+		document.addEventListener('mousedown', handleUserInteraction);
+		document.addEventListener('touchstart', handleUserInteraction);
+		document.addEventListener('keydown', handleUserInteraction);
 
-  const handleClose = useCallback(() => {
-    if (iframeRef.current) {
-      iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
-    }
-    setDemoState(null);
-    setHasStarted(false);
-    setDemoLoaded(false);
-    setCopied(false);
-    if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
-    onClose();
-    // Increment key to force iframe to re-mount and clean up WASM state
-    setViewerKey(prev => prev + 1);
-  }, [onClose, iframeRef]);
+		return () => {
+			clearInterval(intervalId);
+			window.removeEventListener('focus', focusIframe);
+			document.removeEventListener('mousedown', handleUserInteraction);
+			document.removeEventListener('touchstart', handleUserInteraction);
+			document.removeEventListener('keydown', handleUserInteraction);
+		};
+	}, [show, iframeRef]);
 
-  const handleInitialPlay = (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    if (iframeRef.current) {
-      iframeRef.current.focus();
-      iframeRef.current.contentWindow?.postMessage({ type: 'pauseDemo', pause: 0 }, '*');
-      triggerIndicator('play');
-      setHasStarted(true);
-      resetControlsTimer();
-    }
-  };
+	const handleClose = useCallback(() => {
+		if (iframeRef.current) {
+			iframeRef.current.contentWindow?.postMessage({ type: 'stopDemo' }, '*');
+		}
+		setDemoState(null);
+		setHasStarted(false);
+		setDemoLoaded(false);
+		setCopied(false);
+		if (shareTimeoutRef.current) window.clearTimeout(shareTimeoutRef.current);
+		onClose();
+		// Increment key to force iframe to re-mount and clean up WASM state
+		setViewerKey(prev => prev + 1);
+	}, [onClose, iframeRef]);
 
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'closeDemoViewer') {
-        handleClose();
-      } else if (event.data?.type === 'demoLoaded') {
-        setDemoLoaded(true);
-      } else if (event.data?.type === 'demoState') {
-        setDemoState(event.data.state);
-      } else if (event.data?.type === 'canvasClick') {
-        // Toggle play/pause and show controls on click inside the canvas
-        if (iframeRef.current) {
-          iframeRef.current.focus();
-        }
-        if (stateRef.current) {
-          const newPaused = !stateRef.current.isPaused;
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
-          triggerIndicator(newPaused ? 'pause' : 'play');
-          if (!newPaused) setHasStarted(true);
-        }
-        resetControlsTimer();
-      } else if (event.data?.type === 'canvasMove') {
-        resetControlsTimer();
-      } else if (event.data?.type === 'togglePause') {
-        if (stateRef.current) {
-          const newPaused = !stateRef.current.isPaused;
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
-          triggerIndicator(newPaused ? 'pause' : 'play');
-          if (!newPaused) setHasStarted(true);
-        }
-      } else if (event.data?.type === 'skip') {
-        if (stateRef.current) {
-          const skipTicks = skipIntervalRef.current * 50;
-          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + (event.data.direction * skipTicks)));
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
-        }
-      } else if (event.data?.type === 'changeSpeed') {
-        if (stateRef.current) {
-          const newSpeed = event.data.direction > 0 ?
-            Math.min(10.0, stateRef.current.speed + 0.25) :
-            Math.max(0.25, stateRef.current.speed - 0.25);
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
-        }
-      }
-    };
+	const handleInitialPlay = (e: React.MouseEvent | React.TouchEvent) => {
+		e.stopPropagation();
+		if (iframeRef.current) {
+			iframeRef.current.focus();
+			iframeRef.current.contentWindow?.postMessage({ type: 'pauseDemo', pause: 0 }, '*');
+			triggerIndicator('play');
+			setHasStarted(true);
+			resetControlsTimer();
+		}
+	};
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!show) return;
-      if (e.key === 'Escape' || e.keyCode === 27) {
-        e.preventDefault();
-        handleClose();
-      } else if (e.key === ' ' || e.keyCode === 32) {
-        e.preventDefault();
-        if (stateRef.current && !e.repeat) {
-          const newPaused = !stateRef.current.isPaused;
-          iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
-          triggerIndicator(newPaused ? 'pause' : 'play');
-          if (!newPaused) setHasStarted(true);
-        }
-      } else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
-        e.preventDefault();
-        if (stateRef.current) {
-          const skipTicks = skipIntervalRef.current * 50;
-          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick - skipTicks));
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
-        }
-      } else if (e.key === 'ArrowRight' || e.keyCode === 39) {
-        e.preventDefault();
-        if (stateRef.current) {
-          const skipTicks = skipIntervalRef.current * 50;
-          const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + skipTicks));
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
-        }
-      } else if (e.key === 'ArrowUp' || e.keyCode === 38) {
-        e.preventDefault();
-        if (stateRef.current) {
-          const newSpeed = Math.min(10.0, stateRef.current.speed + 0.25);
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
-        }
-      } else if (e.key === 'ArrowDown' || e.keyCode === 40) {
-        e.preventDefault();
-        if (stateRef.current) {
-          const newSpeed = Math.max(0.25, stateRef.current.speed - 0.25);
-          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
-        }
-      }
-    };
+	useEffect(() => {
+		const handleMessage = (event: MessageEvent) => {
+			if (event.data?.type === 'closeDemoViewer') {
+				handleClose();
+			} else if (event.data?.type === 'demoLoaded') {
+				setDemoLoaded(true);
+			} else if (event.data?.type === 'demoState') {
+				setDemoState(event.data.state);
+			} else if (event.data?.type === 'canvasClick') {
+				// Toggle play/pause and show controls on click inside the canvas
+				if (iframeRef.current) {
+					iframeRef.current.focus();
+				}
+				if (stateRef.current) {
+					const newPaused = !stateRef.current.isPaused;
+					iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+					triggerIndicator(newPaused ? 'pause' : 'play');
+					if (!newPaused) setHasStarted(true);
+				}
+				resetControlsTimer();
+			} else if (event.data?.type === 'canvasMove') {
+				resetControlsTimer();
+			} else if (event.data?.type === 'togglePause') {
+				if (stateRef.current) {
+					const newPaused = !stateRef.current.isPaused;
+					iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+					triggerIndicator(newPaused ? 'pause' : 'play');
+					if (!newPaused) setHasStarted(true);
+				}
+			} else if (event.data?.type === 'skip') {
+				if (stateRef.current) {
+					const skipTicks = skipIntervalRef.current * 50;
+					const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + (event.data.direction * skipTicks)));
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+				}
+			} else if (event.data?.type === 'changeSpeed') {
+				if (stateRef.current) {
+					const newSpeed = event.data.direction > 0 ?
+						Math.min(10.0, stateRef.current.speed + 0.25) :
+						Math.max(0.25, stateRef.current.speed - 0.25);
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+				}
+			}
+		};
 
-    window.addEventListener('message', handleMessage);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('message', handleMessage);
-      window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [show, resetControlsTimer, handleClose, iframeRef]);
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (!show) return;
+			if (e.key === 'Escape' || e.keyCode === 27) {
+				e.preventDefault();
+				handleClose();
+			} else if (e.key === ' ' || e.keyCode === 32) {
+				e.preventDefault();
+				if (stateRef.current && !e.repeat) {
+					const newPaused = !stateRef.current.isPaused;
+					iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+					triggerIndicator(newPaused ? 'pause' : 'play');
+					if (!newPaused) setHasStarted(true);
+				}
+			} else if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+				e.preventDefault();
+				if (stateRef.current) {
+					const skipTicks = skipIntervalRef.current * 50;
+					const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick - skipTicks));
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+				}
+			} else if (e.key === 'ArrowRight' || e.keyCode === 39) {
+				e.preventDefault();
+				if (stateRef.current) {
+					const skipTicks = skipIntervalRef.current * 50;
+					const newTick = Math.max(stateRef.current.firstTick, Math.min(stateRef.current.lastTick, stateRef.current.currentTick + skipTicks));
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: newTick }, '*');
+				}
+			} else if (e.key === 'ArrowUp' || e.keyCode === 38) {
+				e.preventDefault();
+				if (stateRef.current) {
+					const newSpeed = Math.min(10.0, stateRef.current.speed + 0.25);
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+				}
+			} else if (e.key === 'ArrowDown' || e.keyCode === 40) {
+				e.preventDefault();
+				if (stateRef.current) {
+					const newSpeed = Math.max(0.25, stateRef.current.speed - 0.25);
+					iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+				}
+			}
+		};
 
-  const handleScrubberAction = useCallback((clientX: number) => {
-    if (!scrubberRef.current || !stateRef.current) return;
-    const rect = scrubberRef.current.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const totalTicks = stateRef.current.lastTick - stateRef.current.firstTick;
-    const targetTick = stateRef.current.firstTick + Math.round(percentage * totalTicks);
-    iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: targetTick }, '*');
-  }, [iframeRef]);
+		window.addEventListener('message', handleMessage);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('message', handleMessage);
+			window.removeEventListener('keydown', handleKeyDown);
+		}
+	}, [show, resetControlsTimer, handleClose, iframeRef]);
 
-  const onMouseDown = (e: React.MouseEvent) => {
-    setIsDragging(true);
-    handleScrubberAction(e.clientX);
-  };
+	const handleScrubberAction = useCallback((clientX: number) => {
+		if (!scrubberRef.current || !stateRef.current) return;
+		const rect = scrubberRef.current.getBoundingClientRect();
+		const x = clientX - rect.left;
+		const percentage = Math.max(0, Math.min(1, x / rect.width));
+		const totalTicks = stateRef.current.lastTick - stateRef.current.firstTick;
+		const targetTick = stateRef.current.firstTick + Math.round(percentage * totalTicks);
+		iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoPos', tick: targetTick }, '*');
+	}, [iframeRef]);
 
-  const onTouchStart = (e: React.TouchEvent) => {
-    setIsDragging(true);
-    handleScrubberAction(e.touches[0].clientX);
-    resetControlsTimer();
-  };
+	const onMouseDown = (e: React.MouseEvent) => {
+		setIsDragging(true);
+		handleScrubberAction(e.clientX);
+	};
 
-  const toggleControls = (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
+	const onTouchStart = (e: React.TouchEvent) => {
+		setIsDragging(true);
+		handleScrubberAction(e.touches[0].clientX);
+		resetControlsTimer();
+	};
 
-    // Toggle play/pause on click inside the viewer body
-    if (demoState) {
-      const newPaused = !demoState.isPaused;
-      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
-      triggerIndicator(newPaused ? 'pause' : 'play');
-      if (!newPaused) setHasStarted(true);
-    } else if (pendingDemo) {
-      iframeRef.current?.contentWindow?.postMessage({
-        type: 'playDemo',
-        demoUrl: pendingDemo.url,
-        demoName: pendingDemo.name
-      }, '*');
-      setHasStarted(true);
-    }
+	const toggleControls = (e: React.MouseEvent | React.TouchEvent) => {
+		e.stopPropagation();
 
-    if (!showControls) {
-      resetControlsTimer();
-    } else {
-      setShowControls(false);
-      if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
-    }
-    // Also refocus iframe on any click in the viewer area
-    if (iframeRef.current) {
-      iframeRef.current.focus();
-    }
-  };
+		// Toggle play/pause on click inside the viewer body
+		if (demoState) {
+			const newPaused = !demoState.isPaused;
+			iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+			triggerIndicator(newPaused ? 'pause' : 'play');
+			if (!newPaused) setHasStarted(true);
+		} else if (pendingDemo) {
+			iframeRef.current?.contentWindow?.postMessage({
+				type: 'playDemo',
+				demoUrl: pendingDemo.url,
+				demoName: pendingDemo.name.split('/').pop() || pendingDemo.name
+			}, '*');
+			setHasStarted(true);
+		}
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) handleScrubberAction(e.clientX);
-    };
-    const handleTouchMove = (e: TouchEvent) => {
-      if (isDragging) {
-        handleScrubberAction(e.touches[0].clientX);
-        resetControlsTimer();
-      }
-    };
-    const handleMouseUp = () => setIsDragging(false);
-    const handleTouchEnd = () => setIsDragging(false);
+		if (!showControls) {
+			resetControlsTimer();
+		} else {
+			setShowControls(false);
+			if (controlsTimeoutRef.current) window.clearTimeout(controlsTimeoutRef.current);
+		}
+		// Also refocus iframe on any click in the viewer area
+		if (iframeRef.current) {
+			iframeRef.current.focus();
+		}
+	};
 
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      window.addEventListener('touchend', handleTouchEnd);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [isDragging, handleScrubberAction, resetControlsTimer]);
+	useEffect(() => {
+		const handleMouseMove = (e: MouseEvent) => {
+			if (isDragging) handleScrubberAction(e.clientX);
+		};
+		const handleTouchMove = (e: TouchEvent) => {
+			if (isDragging) {
+				handleScrubberAction(e.touches[0].clientX);
+				resetControlsTimer();
+			}
+		};
+		const handleMouseUp = () => setIsDragging(false);
+		const handleTouchEnd = () => setIsDragging(false);
 
-  const handleOverlayMouseDown = (e: React.MouseEvent) => {
-    // We only care if the click started directly on the overlay with left click
-    if (e.target === e.currentTarget && e.button === 0) {
-      startedOnOverlayRef.current = true;
-    } else {
-      startedOnOverlayRef.current = false;
-    }
-    // Also refocus iframe on any click in the overlay area
-    if (iframeRef.current) {
-      iframeRef.current.focus();
-    }
-  };
+		if (isDragging) {
+			window.addEventListener('mousemove', handleMouseMove);
+			window.addEventListener('mouseup', handleMouseUp);
+			window.addEventListener('touchmove', handleTouchMove, { passive: false });
+			window.addEventListener('touchend', handleTouchEnd);
+		}
+		return () => {
+			window.removeEventListener('mousemove', handleMouseMove);
+			window.removeEventListener('mouseup', handleMouseUp);
+			window.removeEventListener('touchmove', handleTouchMove);
+			window.removeEventListener('touchend', handleTouchEnd);
+		};
+	}, [isDragging, handleScrubberAction, resetControlsTimer]);
 
-  const handleOverlayMouseUp = (e: React.MouseEvent) => {
-    // Only close if it both started and ended on the overlay with a left click
-    if (e.target === e.currentTarget && startedOnOverlayRef.current && e.button === 0) {
-      handleClose();
-    }
-    startedOnOverlayRef.current = false;
-    // Also refocus iframe on any click in the overlay area
-    if (iframeRef.current) {
-      iframeRef.current.focus();
-    }
-  };
+	const handleOverlayMouseDown = (e: React.MouseEvent) => {
+		// We only care if the click started directly on the overlay with left click
+		if (e.target === e.currentTarget && e.button === 0) {
+			startedOnOverlayRef.current = true;
+		} else {
+			startedOnOverlayRef.current = false;
+		}
+		// Also refocus iframe on any click in the overlay area
+		if (iframeRef.current) {
+			iframeRef.current.focus();
+		}
+	};
 
-  const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
+	const handleOverlayMouseUp = (e: React.MouseEvent) => {
+		// Only close if it both started and ended on the overlay with a left click
+		if (e.target === e.currentTarget && startedOnOverlayRef.current && e.button === 0) {
+			handleClose();
+		}
+		startedOnOverlayRef.current = false;
+		// Also refocus iframe on any click in the overlay area
+		if (iframeRef.current) {
+			iframeRef.current.focus();
+		}
+	};
 
-  if (!hasLoaded) return null;
+	const progressPercent = demoState ? ((demoState.currentTick - demoState.firstTick) / (demoState.lastTick - demoState.firstTick)) * 100 : 0;
 
-  return (
-    <div
-      className="modal-overlay"
-      style={{ display: show ? 'flex' : 'none' }}
-      onMouseDown={handleOverlayMouseDown}
-      onMouseUp={handleOverlayMouseUp}
-    >
-      <div className={`modal-content demo-viewer-content ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
-        <div className="modal-header demo-viewer-header">
-          <div className="header-info">
-            <PlayCircle size={18} className="text-blue" />
-            <h3>{pendingDemo ? pendingDemo.name.split('_')[0] : 'Demo Viewer'}</h3>
-            <span className="demo-filename">{pendingDemo ? pendingDemo.name : ''}</span>
-          </div>
-          <div className="modal-actions">
-            {copied && <span key={copyKey} className="copied-message">Copied!</span>}
-            <button
-              className="share-button"
-              onClick={handleShare}
-              title="Share Demo"
-            >
-              Share
-            </button>
-            <button className="close-button" onClick={handleClose}><X size={24} /></button>
-          </div>
-        </div>
-        <div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer} onClick={toggleControls}>
-          <iframe
-            key={viewerKey}
-            ref={iframeRef}
-            onLoad={() => iframeRef.current?.focus()}
-            src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`}
-            title="DDNet Demo Viewer"
-            allow="fullscreen; autoplay"
-            tabIndex={0}
-            style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
-          />
+	if (!hasLoaded) return null;
 
-          {!hasStarted && demoLoaded && (
-            <div className="initial-play-overlay" onClick={handleInitialPlay}>
-              <button className="initial-play-button" title="Play Demo">
-                <Play size={48} fill="white" />
-              </button>
-            </div>
-          )}
+	return (
+		<div
+			className="modal-overlay"
+			style={{ display: show ? 'flex' : 'none' }}
+			onMouseDown={handleOverlayMouseDown}
+			onMouseUp={handleOverlayMouseUp}
+		>
+			<div className={`modal-content demo-viewer-content ${isFullscreen ? 'fullscreen' : ''}`} ref={containerRef}>
+				<div className="modal-header demo-viewer-header">
+					<div className="header-info">
+						<PlayCircle size={18} className="text-blue" />
+						<h3>{pendingDemo ? (pendingDemo.name.split('/').pop() || '').split('_')[0] : 'Demo Viewer'}</h3>
+						<span className="demo-filename">{pendingDemo ? pendingDemo.name : ''}</span>
+					</div>
+					<div className="modal-actions">
+						{copied && <span key={copyKey} className="copied-message">Copied!</span>}
+						<button
+							className="share-button"
+							onClick={handleShare}
+							title="Share Demo"
+						>
+							Share
+						</button>
+						<button className="close-button" onClick={handleClose}><X size={24} /></button>
+					</div>
+				</div>
+				<div className={`modal-body demo-viewer-body ${isDragging ? 'dragging' : ''}`} onMouseMove={resetControlsTimer} onMouseEnter={resetControlsTimer} onClick={toggleControls}>
+					<iframe
+						key={viewerKey}
+						ref={iframeRef}
+						onLoad={() => iframeRef.current?.focus()}
+						src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}/demo-viewer/DDNet.html`}
+						title="DDNet Demo Viewer"
+						allow="fullscreen; autoplay"
+						tabIndex={0}
+						style={{ pointerEvents: isDragging ? 'none' : 'auto', width: '100%', height: '100%', border: 'none', position: 'relative', zIndex: 1 }}
+					/>
 
-          {playIndicator && (
-            <div key={indicatorKey} className="play-pause-indicator animate">
-              {playIndicator === 'play' ? <Play size={40} fill="white" /> : <Pause size={40} fill="white" />}
-            </div>
-          )}
+					{!hasStarted && demoLoaded && (
+						<div className="initial-play-overlay" onClick={handleInitialPlay}>
+							<button className="initial-play-button" title="Play Demo">
+								<Play size={48} fill="white" />
+							</button>
+						</div>
+					)}
 
-          <div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }} onClick={e => e.stopPropagation()}>
-            {demoState && (
-              <div
-                className="demo-scrubber-wrapper"
-                ref={scrubberRef}
-                onMouseDown={onMouseDown}
-                onTouchStart={onTouchStart}
-                style={{ height: '30px', display: 'flex', alignItems: 'center' }}
-              >
-                <div className="demo-scrubber-track" style={{ width: '100%' }}>
-                  <div className="scrubber-progress" style={{ width: `${progressPercent}%` }}></div>
-                  <div className="scrubber-handle" style={{ left: `${progressPercent}%`, display: 'block' }}></div>
-                </div>
-              </div>
-            )}
+					{playIndicator && (
+						<div key={indicatorKey} className="play-pause-indicator animate">
+							{playIndicator === 'play' ? <Play size={40} fill="white" /> : <Pause size={40} fill="white" />}
+						</div>
+					)}
 
-            <div className="demo-controls-bar">
-              <div className="controls-left">
-                <button
-                  className="demo-play-pause"
-                  onClick={() => {
-                    if (demoState) {
-                      const newPaused = !demoState.isPaused;
-                      iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
-                      if (!newPaused) setHasStarted(true);
-                    } else if (pendingDemo) {
-                      iframeRef.current?.contentWindow?.postMessage({
-                        type: 'playDemo',
-                        demoUrl: pendingDemo.url,
-                        demoName: pendingDemo.name
-                      }, '*');
-                      setHasStarted(true);
-                    }
-                  }}
-                >
-                  {(demoState && !demoState.isPaused) ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: '2px' }} />}
-                </button>
+					<div className={`demo-timeline-container ${(!demoState && !pendingDemo) || (!showControls && !isDragging) ? 'hidden' : ''}`} style={{ zIndex: 100 }} onClick={e => e.stopPropagation()}>
+						{demoState && (
+							<div
+								className="demo-scrubber-wrapper"
+								ref={scrubberRef}
+								onMouseDown={onMouseDown}
+								onTouchStart={onTouchStart}
+								style={{ height: '30px', display: 'flex', alignItems: 'center' }}
+							>
+								<div className="demo-scrubber-track" style={{ width: '100%' }}>
+									<div className="scrubber-progress" style={{ width: `${progressPercent}%` }}></div>
+									<div className="scrubber-handle" style={{ left: `${progressPercent}%`, display: 'block' }}></div>
+								</div>
+							</div>
+						)}
 
-                {demoState && (
-                  <div className="demo-time-display">
-                    <span className="current">{formatTick(demoState.currentTick - demoState.firstTick)}</span>
-                    <span className="separator">/</span>
-                    <span className="total">{formatTick(demoState.lastTick - demoState.firstTick)}</span>
-                  </div>
-                )}
-              </div>
+						<div className="demo-controls-bar">
+							<div className="controls-left">
+								<button
+									className="demo-play-pause"
+									onClick={() => {
+										if (demoState) {
+											const newPaused = !demoState.isPaused;
+											iframeRef.current?.contentWindow?.postMessage({ type: 'pauseDemo', pause: newPaused }, '*');
+											if (!newPaused) setHasStarted(true);
+										} else if (pendingDemo) {
+											iframeRef.current?.contentWindow?.postMessage({
+												type: 'playDemo',
+												demoUrl: pendingDemo.url,
+												demoName: pendingDemo.name.split('/').pop() || pendingDemo.name
+											}, '*');
+											setHasStarted(true);
+										}
+									}}
+								>
+									{(demoState && !demoState.isPaused) ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" style={{ marginLeft: '2px' }} />}
+								</button>
 
-              {!demoState && pendingDemo && (
-                <div className="demo-status-text">Loading replay...</div>
-              )}
+								{demoState && (
+									<div className="demo-time-display">
+										<span className="current">{formatTick(demoState.currentTick - demoState.firstTick)}</span>
+										<span className="separator">/</span>
+										<span className="total">{formatTick(demoState.lastTick - demoState.firstTick)}</span>
+									</div>
+								)}
+							</div>
 
-              <div className="controls-right">
-                {demoState && (
-                  <>
-                    <div className="skip-interval-selector">
-                      <span className="label">Skip:</span>
-                      <select value={skipInterval} onChange={(e) => setSkipInterval(parseFloat(e.target.value))}>
-                        {SKIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}s</option>)}
-                      </select>
-                    </div>
-                    <div className="demo-speed-selector">
-                      <button
-                        className="speed-btn"
-                        onClick={() => {
-                          const newSpeed = Math.max(0.25, demoState.speed - 0.25);
-                          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
-                        }}
-                      >
-                        -
-                      </button>
-                      <div className="speed-value">
-                        <Clock size={14} />
-                        <span>{demoState.speed.toFixed(2)}x</span>
-                      </div>
-                      <button
-                        className="speed-btn"
-                        onClick={() => {
-                          const newSpeed = Math.min(10.0, demoState.speed + 0.25);
-                          iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
-                        }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </>
-                )}
+							{!demoState && pendingDemo && (
+								<div className="demo-status-text">Loading replay...</div>
+							)}
 
-                <button
-                  className="maximize-btn"
-                  onClick={toggleFullscreen}
-                  title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
-                >
-                  {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+							<div className="controls-right">
+								{demoState && (
+									<>
+										<div className="skip-interval-selector">
+											<span className="label">Skip:</span>
+											<select value={skipInterval} onChange={(e) => setSkipInterval(parseFloat(e.target.value))}>
+												{SKIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}s</option>)}
+											</select>
+										</div>
+										<div className="demo-speed-selector">
+											<button
+												className="speed-btn"
+												onClick={() => {
+													const newSpeed = Math.max(0.25, demoState.speed - 0.25);
+													iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+												}}
+											>
+												-
+											</button>
+											<div className="speed-value">
+												<Clock size={14} />
+												<span>{demoState.speed.toFixed(2)}x</span>
+											</div>
+											<button
+												className="speed-btn"
+												onClick={() => {
+													const newSpeed = Math.min(10.0, demoState.speed + 0.25);
+													iframeRef.current?.contentWindow?.postMessage({ type: 'setDemoSpeed', speed: Math.round(newSpeed * 100) / 100 }, '*');
+												}}
+											>
+												+
+											</button>
+										</div>
+									</>
+								)}
+
+								<button
+									className="maximize-btn"
+									onClick={toggleFullscreen}
+									title={isFullscreen ? "Exit Full Screen" : "Full Screen"}
+								>
+									{isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	);
 }
 
 function MapPreview({ mapName, difficulty, isFull = false, onClose }: { mapName: string, difficulty: string, isFull?: boolean, onClose?: () => void }) {
-  const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
-  const [hasError, setHasError] = useState(false);
-  const [imgSrc, setImgSrc] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [copyKey, setCopyKey] = useState(0);
-  const timeoutRef = useRef<number | null>(null);
+	const baseUrl = import.meta.env.BASE_URL.replace(/\/$/, '');
+	const [hasError, setHasError] = useState(false);
+	const [imgSrc, setImgSrc] = useState<string>('');
+	const [isLoading, setIsLoading] = useState(true);
+	const [copied, setCopied] = useState(false);
+	const [copyKey, setCopyKey] = useState(0);
+	const timeoutRef = useRef<number | null>(null);
 
-  // Preload and manage thumbnail
-  useEffect(() => {
-    if (isFull) return;
+	// Preload and manage thumbnail
+	useEffect(() => {
+		if (isFull) return;
 
-    setIsLoading(true);
-    setHasError(false);
+		setIsLoading(true);
+		setHasError(false);
 
-    const url = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
-    const img = new Image();
-    img.src = url;
-    img.onload = () => {
-      setImgSrc(url);
-      setIsLoading(false);
-      setHasError(false);
-    };
-    img.onerror = () => {
-      setHasError(true);
-      setIsLoading(false);
-    };
-  }, [mapName, baseUrl, isFull]);
+		const url = `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`;
+		const img = new Image();
+		img.src = url;
+		img.onload = () => {
+			setImgSrc(url);
+			setIsLoading(false);
+			setHasError(false);
+		};
+		img.onerror = () => {
+			setHasError(true);
+			setIsLoading(false);
+		};
+	}, [mapName, baseUrl, isFull]);
 
-  // Reset copied state when map changes
-  useEffect(() => {
-    setCopied(false);
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-  }, [mapName]);
+	// Reset copied state when map changes
+	useEffect(() => {
+		setCopied(false);
+		if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+	}, [mapName]);
 
-  // Handle Escape key for full preview
-  useEffect(() => {
-    if (!isFull || !onClose) return;
+	// Handle Escape key for full preview
+	useEffect(() => {
+		if (!isFull || !onClose) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				onClose();
+			}
+		};
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFull, onClose]);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [isFull, onClose]);
 
-  if (isFull) {
-    const diffParam = difficulty.toUpperCase();
-    const url = `${baseUrl}/map_preview.html?map=${encodeURIComponent(mapName)}&diff=${encodeURIComponent(diffParam)}`;
+	if (isFull) {
+		const diffParam = difficulty.toUpperCase();
+		const url = `${baseUrl}/map_preview.html?map=${encodeURIComponent(mapName)}&diff=${encodeURIComponent(diffParam)}`;
 
-    const handleShare = () => {
-      const shareUrl = `${window.location.origin}${baseUrl}/preview/${encodeURIComponent(mapName)}.html`;
-      navigator.clipboard.writeText(shareUrl);
+		const handleShare = () => {
+			const shareUrl = `${window.location.origin}${baseUrl}/preview/${encodeURIComponent(mapName)}.html`;
+			navigator.clipboard.writeText(shareUrl);
 
-      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+			if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
 
-      setCopied(true);
-      setCopyKey(prev => prev + 1);
+			setCopied(true);
+			setCopyKey(prev => prev + 1);
 
-      timeoutRef.current = window.setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-    };
+			timeoutRef.current = window.setTimeout(() => {
+				setCopied(false);
+			}, 2000);
+		};
 
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h3>{mapName}</h3>
-            <div className="modal-actions">
-              {copied && <span key={copyKey} className="copied-message">Copied!</span>}
-              <button
-                className="share-button"
-                onClick={handleShare}
-                title="Share"
-              >
-                Share
-              </button>
-              <button className="close-button" onClick={onClose}><X size={24} /></button>
-            </div>
-          </div>
-          <div className="modal-body">
-            <iframe src={url} title={`Map preview: ${mapName}`} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+		return (
+			<div className="modal-overlay" onClick={onClose}>
+				<div className="modal-content" onClick={e => e.stopPropagation()}>
+					<div className="modal-header">
+						<h3>{mapName}</h3>
+						<div className="modal-actions">
+							{copied && <span key={copyKey} className="copied-message">Copied!</span>}
+							<button
+								className="share-button"
+								onClick={handleShare}
+								title="Share"
+							>
+								Share
+							</button>
+							<button className="close-button" onClick={onClose}><X size={24} /></button>
+						</div>
+					</div>
+					<div className="modal-body">
+						<iframe src={url} title={`Map preview: ${mapName}`} />
+					</div>
+				</div>
+			</div>
+		);
+	}
 
-  return (
-    <div className="hover-preview">
-      {hasError ? (
-        <span className="hover-preview-loading">No preview available</span>
-      ) : (
-        <img
-          src={imgSrc || `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`}
-          alt={`Map preview: ${mapName}`}
-          className={isLoading ? 'loading' : ''}
-        />
-      )}
-    </div>
-  );
+	return (
+		<div className="hover-preview">
+			{hasError ? (
+				<span className="hover-preview-loading">No preview available</span>
+			) : (
+				<img
+					src={imgSrc || `${baseUrl}/thumbnails/${encodeURIComponent(mapName)}.png`}
+					alt={`Map preview: ${mapName}`}
+					className={isLoading ? 'loading' : ''}
+				/>
+			)}
+		</div>
+	);
 }
 
 function App() {
-  const [search, setSearch] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('q') || '';
-  })
-  const [diffFilter, setDiffFilter] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('diff') || 'All';
-    return DIFFICULTIES.includes(val) ? val : 'All';
-  })
-  const [lengthFilter, setLengthFilter] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('length') || 'All';
-    return LENGTHS.includes(val) ? val : 'All';
-  })
-  const [statusFilter, setStatusFilter] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('status') || 'All';
-    return VALID_STATUS.includes(val) ? val : 'All';
-  })
-  const [currentPlayer, setCurrentPlayer] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('player') || 'All Players';
-    return ALL_PLAYERS.includes(val) ? val : 'All Players';
-  })
-  const [sortField, setSortField] = useState<SortField>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('sort') as SortField;
-    return VALID_SORT_FIELDS.includes(val) ? val : 'name';
-  })
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const val = params.get('order');
-    return val === 'asc' || val === 'desc' ? val : 'asc';
-  })
+	const [search, setSearch] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		return params.get('q') || '';
+	})
+	const [diffFilter, setDiffFilter] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('diff') || 'All';
+		return DIFFICULTIES.includes(val) ? val : 'All';
+	})
+	const [lengthFilter, setLengthFilter] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('length') || 'All';
+		return LENGTHS.includes(val) ? val : 'All';
+	})
+	const [statusFilter, setStatusFilter] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('status') || 'All';
+		return VALID_STATUS.includes(val) ? val : 'All';
+	})
+	const [currentPlayer, setCurrentPlayer] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('player') || 'All Players';
+		return ALL_PLAYERS.includes(val) ? val : 'All Players';
+	})
+	const [sortField, setSortField] = useState<SortField>(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('sort') as SortField;
+		return VALID_SORT_FIELDS.includes(val) ? val : 'name';
+	})
+	const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => {
+		const params = new URLSearchParams(window.location.search);
+		const val = params.get('order');
+		return val === 'asc' || val === 'desc' ? val : 'asc';
+	})
 
-  const [showDemoViewer, setShowDemoViewer] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return !!params.get('demo');
-  });
-  const hasLoadedDemoViewer = true;
-  const [pendingDemo, setPendingDemo] = useState<{ url: string, name: string } | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const demoName = params.get('demo');
-    if (demoName) {
-      const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
-      return { url: demoUrl, name: demoName };
-    }
-    return null;
-  });
+	const [showDemoViewer, setShowDemoViewer] = useState(() => {
+		const params = new URLSearchParams(window.location.search);
+		return !!params.get('demo');
+	});
+	const hasLoadedDemoViewer = true;
+	const [pendingDemo, setPendingDemo] = useState<{ url: string, name: string } | null>(() => {
+		const params = new URLSearchParams(window.location.search);
+		const demoParam = params.get('demo');
+		if (demoParam) {
+			let demoUrl: string;
+			if (demoParam.includes('/')) {
+				const parts = demoParam.split('/');
+				// Use the actual parts for the URL, encoding each segment
+				demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${parts.map(encodeURIComponent).join('/')}`;
+			} else {
+				// Legacy support or fallback: try to infer player from filename MapName_TimeInSeconds_PlayerName.demo
+				// Note: This is just a best-effort fallback if the full path wasn't provided in the URL
+				const parts = demoParam.split('_');
+				if (parts.length >= 3) {
+					const player = parts[parts.length - 1].replace('.demo', '');
+					demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(player)}/${encodeURIComponent(demoParam)}`;
+				} else {
+					// Last resort: assume it's in the root or let it 404
+					demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoParam)}`;
+				}
+			}
+			return { url: demoUrl, name: demoParam };
+		}
+		return null;
+	});
 
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+	const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const closeViewer = useCallback(() => {
-    setShowDemoViewer(false);
-    setPendingDemo(null);
-  }, []);
+	const closeViewer = useCallback(() => {
+		setShowDemoViewer(false);
+		setPendingDemo(null);
+	}, []);
 
-  const handlePlayDemo = useCallback((e: React.MouseEvent, mapName: string, player: string, time: number) => {
-    e.stopPropagation();
-    const demoName = `${mapName}_${time.toFixed(3)}_${player}.demo`;
-    const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(demoName)}`;
+	const handlePlayDemo = useCallback((e: React.MouseEvent, _mapName: string, player: string, filename: string) => {
+		e.stopPropagation();
+		const demoPath = `${player}/${filename}`;
+		const demoUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/demos/${encodeURIComponent(player)}/${encodeURIComponent(filename)}`;
 
-    setPendingDemo({ url: demoUrl, name: demoName });
-    setShowDemoViewer(true);
-  }, []);
+		setPendingDemo({ url: demoUrl, name: demoPath });
+		setShowDemoViewer(true);
+	}, []);
 
-  const [selectedMap, setSelectedMap] = useState<{ name: string, difficulty: string } | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const mapName = params.get('preview');
-    if (mapName) {
-      const map = data.maps.find(m => m.name === mapName);
-      if (map) return { name: map.name, difficulty: map.difficulty };
-    }
-    return null;
-  });
+	const [selectedMap, setSelectedMap] = useState<{ name: string, difficulty: string } | null>(() => {
+		const params = new URLSearchParams(window.location.search);
+		const mapName = params.get('preview');
+		if (mapName) {
+			const map = data.maps.find(m => m.name === mapName);
+			if (map) return { name: map.name, difficulty: map.difficulty };
+		}
+		return null;
+	});
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (search) params.set('q', search);
-    if (diffFilter !== 'All') params.set('diff', diffFilter);
-    if (lengthFilter !== 'All') params.set('length', lengthFilter);
-    if (statusFilter !== 'All') params.set('status', statusFilter);
-    if (currentPlayer !== 'All Players') params.set('player', currentPlayer);
-    if (sortField !== 'name') params.set('sort', sortField);
-    if (sortOrder !== 'asc') params.set('order', sortOrder);
-    if (selectedMap) params.set('preview', selectedMap.name);
-    if (pendingDemo) params.set('demo', pendingDemo.name);
+	useEffect(() => {
+		const params = new URLSearchParams();
+		if (search) params.set('q', search);
+		if (diffFilter !== 'All') params.set('diff', diffFilter);
+		if (lengthFilter !== 'All') params.set('length', lengthFilter);
+		if (statusFilter !== 'All') params.set('status', statusFilter);
+		if (currentPlayer !== 'All Players') params.set('player', currentPlayer);
+		if (sortField !== 'name') params.set('sort', sortField);
+		if (sortOrder !== 'asc') params.set('order', sortOrder);
+		if (selectedMap) params.set('preview', selectedMap.name);
+		if (pendingDemo) params.set('demo', pendingDemo.name);
 
-    const queryString = params.toString();
-    const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
-    window.history.replaceState(null, '', newRelativePathQuery);
-  }, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder, selectedMap, pendingDemo]);
+		const queryString = params.toString();
+		const newRelativePathQuery = window.location.pathname + (queryString ? '?' + queryString : '');
+		window.history.replaceState(null, '', newRelativePathQuery);
+	}, [search, diffFilter, lengthFilter, statusFilter, currentPlayer, sortField, sortOrder, selectedMap, pendingDemo]);
 
-  const difficulties = DIFFICULTIES;
-  const allPlayers = ALL_PLAYERS;
+	const difficulties = DIFFICULTIES;
+	const allPlayers = ALL_PLAYERS;
 
-  const getMapTime = (mapName: string) => {
-    const mapProgress = data.progress[mapName] || {};
-    if (currentPlayer === 'All Players') {
-      const times = Object.values(mapProgress);
-      return times.length > 0 ? Math.min(...times) : Infinity;
-    }
-    return mapProgress[currentPlayer] ?? Infinity;
-  };
+	const getMapTime = (mapName: string) => {
+		const mapProgress = data.progress[mapName] || {};
+		if (currentPlayer === 'All Players') {
+			const times = Object.values(mapProgress);
+			return times.length > 0 ? Math.min(...times) : Infinity;
+		}
+		return mapProgress[currentPlayer] ?? Infinity;
+	};
 
-  const filteredMaps = useMemo(() => {
-    return data.maps
-      .filter(m => {
-        const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-          m.creator.toLowerCase().includes(search.toLowerCase());
-        const matchesDiff = diffFilter === 'All' || m.difficulty === diffFilter;
-        const matchesLength = lengthFilter === 'All' || m.length === lengthFilter;
+	const filteredMaps = useMemo(() => {
+		return data.maps
+			.filter(m => {
+				const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
+					m.creator.toLowerCase().includes(search.toLowerCase());
+				const matchesDiff = diffFilter === 'All' || m.difficulty === diffFilter;
+				const matchesLength = lengthFilter === 'All' || m.length === lengthFilter;
 
-        const mapProgress = data.progress[m.name] || {};
-        const isFinishedByCurrent = currentPlayer === 'All Players'
-          ? Object.keys(mapProgress).length > 0
-          : !!mapProgress[currentPlayer];
+				const mapProgress = data.progress[m.name] || {};
+				const isFinishedByCurrent = currentPlayer === 'All Players'
+					? Object.keys(mapProgress).length > 0
+					: !!mapProgress[currentPlayer];
 
-        const matchesStatus = statusFilter === 'All' ||
-          (statusFilter === 'Finished' && isFinishedByCurrent) ||
-          (statusFilter === 'Pending' && !isFinishedByCurrent);
+				const matchesStatus = statusFilter === 'All' ||
+					(statusFilter === 'Finished' && isFinishedByCurrent) ||
+					(statusFilter === 'Pending' && !isFinishedByCurrent);
 
-        return matchesSearch && matchesDiff && matchesLength && matchesStatus;
-      })
-      .sort((a, b) => {
-        let valA: any;
-        let valB: any;
+				return matchesSearch && matchesDiff && matchesLength && matchesStatus;
+			})
+			.sort((a, b) => {
+				let valA: any;
+				let valB: any;
 
-        if (sortField === 'time') {
-          valA = getMapTime(a.name);
-          valB = getMapTime(b.name);
-        } else if (sortField === 'difficulty') {
-          valA = DIFFICULTIES.indexOf(a.difficulty);
-          valB = DIFFICULTIES.indexOf(b.difficulty);
-        } else if (sortField === 'length') {
-          valA = LENGTH_ORDER.indexOf(a.length);
-          valB = LENGTH_ORDER.indexOf(b.length);
-        } else {
-          valA = a[sortField];
-          valB = b[sortField];
-        }
+				if (sortField === 'time') {
+					valA = getMapTime(a.name);
+					valB = getMapTime(b.name);
+				} else if (sortField === 'difficulty') {
+					valA = DIFFICULTIES.indexOf(a.difficulty);
+					valB = DIFFICULTIES.indexOf(b.difficulty);
+				} else if (sortField === 'length') {
+					valA = LENGTH_ORDER.indexOf(a.length);
+					valB = LENGTH_ORDER.indexOf(b.length);
+				} else {
+					valA = a[sortField];
+					valB = b[sortField];
+				}
 
-        if (typeof valA === 'string' && typeof valB === 'string') {
-          return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
-        }
+				if (typeof valA === 'string' && typeof valB === 'string') {
+					return sortOrder === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+				}
 
-        // Handle Infinity for sorting unfinished maps to bottom
-        if (valA === valB) return 0;
-        const res = valA > valB ? 1 : -1;
-        return sortOrder === 'asc' ? res : -res;
-      });
-  }, [search, diffFilter, lengthFilter, statusFilter, sortField, sortOrder, currentPlayer]);
+				// Handle Infinity for sorting unfinished maps to bottom
+				if (valA === valB) return 0;
+				const res = valA > valB ? 1 : -1;
+				return sortOrder === 'asc' ? res : -res;
+			});
+	}, [search, diffFilter, lengthFilter, statusFilter, sortField, sortOrder, currentPlayer]);
 
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder(field === 'time' ? 'asc' : 'asc'); // Usually want fastest first
-    }
-  }
+	const toggleSort = (field: SortField) => {
+		if (sortField === field) {
+			setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+		} else {
+			setSortField(field);
+			setSortOrder(field === 'time' ? 'asc' : 'asc'); // Usually want fastest first
+		}
+	}
 
-  const stats = useMemo(() => {
-    let finished = 0;
-    let points = 0;
-    let maxPoints = 0;
-    let total = 0;
+	const stats = useMemo(() => {
+		let finished = 0;
+		let points = 0;
+		let maxPoints = 0;
+		let total = 0;
 
-    data.maps.forEach(m => {
-      if (diffFilter !== 'All' && m.difficulty !== diffFilter) return;
-      if (lengthFilter !== 'All' && m.length !== lengthFilter) return;
+		data.maps.forEach(m => {
+			if (diffFilter !== 'All' && m.difficulty !== diffFilter) return;
+			if (lengthFilter !== 'All' && m.length !== lengthFilter) return;
 
-      total++;
-      maxPoints += m.points;
-      const mapProgress = data.progress[m.name] || {};
-      const isFinished = currentPlayer === 'All Players'
-        ? Object.keys(mapProgress).length > 0
-        : !!mapProgress[currentPlayer];
+			total++;
+			maxPoints += m.points;
+			const mapProgress = data.progress[m.name] || {};
+			const isFinished = currentPlayer === 'All Players'
+				? Object.keys(mapProgress).length > 0
+				: !!mapProgress[currentPlayer];
 
-      if (isFinished) {
-        finished++;
-        points += m.points;
-      }
-    });
+			if (isFinished) {
+				finished++;
+				points += m.points;
+			}
+		});
 
-    return {
-      finished,
-      total,
-      percent: total > 0 ? ((finished / total) * 100).toFixed(1) : '0.0',
-      points,
-      maxPoints
-    }
-  }, [currentPlayer, diffFilter, lengthFilter]);
+		return {
+			finished,
+			total,
+			percent: total > 0 ? ((finished / total) * 100).toFixed(1) : '0.0',
+			points,
+			maxPoints
+		}
+	}, [currentPlayer, diffFilter, lengthFilter]);
 
-  return (
-    <div className="container">
-      <header className="main-header">
-        <div className="header-content">
-          <div className="title-section">
-            <Award className="icon-gold" size={32} />
-            <h1>KoG Solo Tracker</h1>
-          </div>
-          <div className="stats-bar">
-            <div className="stat-card">
-              <span className="stat-label">{currentPlayer === 'All Players' ? 'Global Progress' : 'Player Progress'}</span>
-              <span className="stat-value">{stats.finished} / {stats.total} ({stats.percent}%)</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-label">Total Points</span>
-              <span className="stat-value">{stats.points} / {stats.maxPoints}</span>
-            </div>
-          </div>
-        </div>
+	return (
+		<div className="container">
+			<header className="main-header">
+				<div className="header-content">
+					<div className="title-section">
+						<Award className="icon-gold" size={32} />
+						<h1>KoG Solo Tracker</h1>
+					</div>
+					<div className="stats-bar">
+						<div className="stat-card">
+							<span className="stat-label">{currentPlayer === 'All Players' ? 'Global Progress' : 'Player Progress'}</span>
+							<span className="stat-value">{stats.finished} / {stats.total} ({stats.percent}%)</span>
+						</div>
+						<div className="stat-card">
+							<span className="stat-label">Total Points</span>
+							<span className="stat-value">{stats.points} / {stats.maxPoints}</span>
+						</div>
+					</div>
+				</div>
 
-        <div className="controls">
-          <div className="search-wrapper">
-            <Search className="search-icon" size={18} />
-            <input
-              type="text"
-              placeholder="Search maps or creators..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
+				<div className="controls">
+					<div className="search-wrapper">
+						<Search className="search-icon" size={18} />
+						<input
+							type="text"
+							placeholder="Search maps or creators..."
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+						/>
+					</div>
 
-          <div className="filters">
-            <div className="filter-group">
-              <Users size={16} />
-              <select value={currentPlayer} onChange={(e) => setCurrentPlayer(e.target.value)}>
-                {allPlayers.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
+					<div className="filters">
+						<div className="filter-group">
+							<Users size={16} />
+							<select value={currentPlayer} onChange={(e) => setCurrentPlayer(e.target.value)}>
+								{allPlayers.map(p => <option key={p} value={p}>{p}</option>)}
+							</select>
+						</div>
 
-            <div className="filter-group">
-              <Filter size={16} />
-              <select value={diffFilter} onChange={(e) => setDiffFilter(e.target.value)}>
-                {difficulties.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
+						<div className="filter-group">
+							<Filter size={16} />
+							<select value={diffFilter} onChange={(e) => setDiffFilter(e.target.value)}>
+								{difficulties.map(d => <option key={d} value={d}>{d}</option>)}
+							</select>
+						</div>
 
-            <div className="filter-group">
-              <Clock size={16} />
-              <select value={lengthFilter} onChange={(e) => setLengthFilter(e.target.value)}>
-                {LENGTHS.map(l => <option key={l} value={l}>{l === 'All' ? 'All Lengths' : l}</option>)}
-              </select>
-            </div>
+						<div className="filter-group">
+							<Clock size={16} />
+							<select value={lengthFilter} onChange={(e) => setLengthFilter(e.target.value)}>
+								{LENGTHS.map(l => <option key={l} value={l}>{l === 'All' ? 'All Lengths' : l}</option>)}
+							</select>
+						</div>
 
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="All">All Status</option>
-              <option value="Finished">Finished</option>
-              <option value="Pending">Pending</option>
-            </select>
-          </div>
-        </div>
-      </header>
+						<select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+							<option value="All">All Status</option>
+							<option value="Finished">Finished</option>
+							<option value="Pending">Pending</option>
+						</select>
+					</div>
+				</div>
+			</header>
 
-      <main className="table-wrapper">
-        <table className="maps-table">
-          <thead>
-            <tr>
-              <th onClick={() => toggleSort('name')} className="sortable">
-                <MapIcon size={16} /> Map {sortField === 'name' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('difficulty')} className="sortable">
-                Difficulty {sortField === 'difficulty' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('stars_count')} className="sortable">
-                <Star size={16} /> Stars {sortField === 'stars_count' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('points')} className="sortable">
-                Points {sortField === 'points' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('length')} className="sortable">
-                Length {sortField === 'length' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('creator')} className="sortable">
-                <User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-              <th onClick={() => toggleSort('time')} className="sortable">
-                <Clock size={16} /> Time / Leaderboard {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredMaps.map(map => (
-              <MapRow
-                key={map.name}
-                map={map}
-                mapProgress={data.progress[map.name] || {}}
-                currentPlayer={currentPlayer}
-                onSelect={setSelectedMap}
-                onPlayDemo={handlePlayDemo}
-              />
-            ))}
-          </tbody>
-        </table>
-      </main>
+			<main className="table-wrapper">
+				<table className="maps-table">
+					<thead>
+						<tr>
+							<th onClick={() => toggleSort('name')} className="sortable">
+								<MapIcon size={16} /> Map {sortField === 'name' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('difficulty')} className="sortable">
+								Difficulty {sortField === 'difficulty' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('stars_count')} className="sortable">
+								<Star size={16} /> Stars {sortField === 'stars_count' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('points')} className="sortable">
+								Points {sortField === 'points' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('length')} className="sortable">
+								Length {sortField === 'length' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('creator')} className="sortable">
+								<User size={16} /> Creator {sortField === 'creator' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+							<th onClick={() => toggleSort('time')} className="sortable">
+								<Clock size={16} /> Time / Leaderboard {sortField === 'time' && (sortOrder === 'asc' ? <SortAsc size={14} /> : <SortDesc size={14} />)}
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						{filteredMaps.map(map => (
+							<MapRow
+								key={map.name}
+								map={map}
+								mapProgress={data.progress[map.name] || {}}
+								mapDemoFiles={(data.filenames && data.filenames[map.name]) || {}}
+								currentPlayer={currentPlayer}
+								onSelect={setSelectedMap}
+								onPlayDemo={handlePlayDemo}
+							/>
+						))}
+					</tbody>
+				</table>
+			</main>
 
-      {filteredMaps.length === 0 && (
-        <div className="empty-state">
-          <p>No maps found matching your search.</p>
-        </div>
-      )}
+			{filteredMaps.length === 0 && (
+				<div className="empty-state">
+					<p>No maps found matching your search.</p>
+				</div>
+			)}
 
-      {selectedMap && (
-        <MapPreview
-          mapName={selectedMap.name}
-          difficulty={selectedMap.difficulty}
-          isFull={true}
-          onClose={() => setSelectedMap(null)}
-        />
-      )}
-      <DemoViewer
-        show={showDemoViewer}
-        hasLoaded={hasLoadedDemoViewer}
-        pendingDemo={pendingDemo}
-        onClose={closeViewer}
-        iframeRef={iframeRef}
-      />
-    </div>
-  )
+			{selectedMap && (
+				<MapPreview
+					mapName={selectedMap.name}
+					difficulty={selectedMap.difficulty}
+					isFull={true}
+					onClose={() => setSelectedMap(null)}
+				/>
+			)}
+			<DemoViewer
+				show={showDemoViewer}
+				hasLoaded={hasLoadedDemoViewer}
+				pendingDemo={pendingDemo}
+				onClose={closeViewer}
+				iframeRef={iframeRef}
+			/>
+		</div>
+	)
 }
 
 export default App
